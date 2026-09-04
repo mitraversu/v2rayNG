@@ -89,21 +89,41 @@ jobs:
         set -o pipefail
         ./gradlew assembleDebug --stacktrace 2>&1 | tee /tmp/build.log
 
-    - name: Push build log to repo on failure
+    - name: Push build log via API on failure
       if: failure()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo "=== Build failed, pushing log to repo branch ==="
+        echo "=== Build failed, pushing log via API ==="
         tail -n 2000 /tmp/build.log > /tmp/tail.log || echo "no log" > /tmp/tail.log
         cat /tmp/tail.log
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        BRANCH="arena/build-log-${{ github.run_id }}"
-        git checkout -b "$BRANCH"
-        cp /tmp/build.log ./build-failure-${{ github.run_id }}.log || cp /tmp/tail.log ./build-failure-${{ github.run_id }}.log
-        cp /tmp/tail.log ./build-tail-${{ github.run_id }}.log
-        git add build-failure-*.log build-tail-*.log
-        git commit -m "build log for ${{ github.run_id }} [skip ci]" || echo "no commit"
-        git push origin "$BRANCH" || echo "push failed"
+        # create file via contents API on branch arena/01a06dcc-v2rayng (overwrite)
+        CONTENT=$(base64 -w 0 /tmp/tail.log)
+        # try to get existing file sha if exists
+        SHA=$(gh api repos/mitraversu/v2rayNG/contents/build-log-tail.txt --jq .sha 2>/dev/null || echo "")
+        if [ -n "$SHA" ]; then
+          echo "existing sha $SHA"
+          gh api --method PUT repos/mitraversu/v2rayNG/contents/build-log-tail.txt \
+            --field message="build log ${{ github.run_id }} [skip ci]" \
+            --field content="$CONTENT" \
+            --field sha="$SHA" \
+            --field branch="arena/01a06dcc-v2rayng" || echo "update failed"
+        else
+          gh api --method PUT repos/mitraversu/v2rayNG/contents/build-log-tail.txt \
+            --field message="build log ${{ github.run_id }} [skip ci]" \
+            --field content="$CONTENT" \
+            --field branch="arena/01a06dcc-v2rayng" || echo "create failed"
+        fi
+        # also full log
+        FULL=$(base64 -w 0 /tmp/build.log 2>/dev/null | head -c 900000) # limit
+        if [ -n "$FULL" ]; then
+          SHA2=$(gh api repos/mitraversu/v2rayNG/contents/build-log-full.txt --jq .sha 2>/dev/null || echo "")
+          if [ -n "$SHA2" ]; then
+            gh api --method PUT repos/mitraversu/v2rayNG/contents/build-log-full.txt --field message="full log ${{ github.run_id }}" --field content="$FULL" --field sha="$SHA2" --field branch="arena/01a06dcc-v2rayng" || true
+          else
+            gh api --method PUT repos/mitraversu/v2rayNG/contents/build-log-full.txt --field message="full log ${{ github.run_id }}" --field content="$FULL" --field branch="arena/01a06dcc-v2rayng" || true
+          fi
+        fi
 
     - name: Upload build log artifact on failure
       if: failure()
