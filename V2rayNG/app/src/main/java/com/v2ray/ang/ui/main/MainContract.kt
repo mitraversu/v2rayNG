@@ -46,6 +46,7 @@ sealed interface MainAction {
     data object SortByTestResults : MainAction
     data object UpdateSubscriptions : MainAction
     data object ExportAll : MainAction
+    data class RemoveByPort(val ports: Set<String>) : MainAction
 
     data object ImportQRcode : MainAction
     data object ImportClipboard : MainAction

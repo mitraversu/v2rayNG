@@ -57,6 +57,7 @@ fun MainScreen(
     var showDelAllConfirm by remember { mutableStateOf(false) }
     var showDelDuplicateConfirm by remember { mutableStateOf(false) }
     var showDelInvalidConfirm by remember { mutableStateOf(false) }
+    var showPortFilter by remember { mutableStateOf(false) }
     var showRemoveConfirm by remember { mutableStateOf<String?>(null) }
 
     var shareTarget by remember { mutableStateOf<Triple<String, ProfileItem, Boolean>?>(null) }
@@ -115,6 +116,17 @@ fun MainScreen(
         onConfirmRemove = { guid -> showRemoveConfirm = null; onAction(MainAction.RemoveServer(guid)) }
     )
 
+    if (showPortFilter) {
+        PortFilterDialog(
+            mainViewModel = mainViewModel,
+            onDismiss = { showPortFilter = false },
+            onConfirm = { ports ->
+                showPortFilter = false
+                onAction(MainAction.RemoveByPort(ports))
+            }
+        )
+    }
+
     if (shareTarget != null) {
         val (guid, profile, more) = shareTarget!!
         ShareMethodDialog(
@@ -167,6 +179,7 @@ fun MainScreen(
                             MainMoreMenuAction.DeleteAll -> showDelAllConfirm = true
                             MainMoreMenuAction.DeleteDuplicate -> showDelDuplicateConfirm = true
                             MainMoreMenuAction.DeleteInvalid -> showDelInvalidConfirm = true
+                            MainMoreMenuAction.FilterByPort -> showPortFilter = true
                             MainMoreMenuAction.ExportAll -> onAction(MainAction.ExportAll)
                             MainMoreMenuAction.LocateSelected -> onAction(MainAction.LocateSelectedServer)
                             MainMoreMenuAction.SortByTestResults -> onAction(MainAction.SortByTestResults)
@@ -187,9 +200,15 @@ fun MainScreen(
             },
             floatingActionButton = {},
         ) { innerPadding ->
-            val layoutDirection = LocalLayoutDirection.current
-
-            if (groups.isNotEmpty()) {
+            if (groups.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                ) {
+                    MainEmptyState(isSearching = searchQuery.isNotBlank())
+                }
+            } else {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()

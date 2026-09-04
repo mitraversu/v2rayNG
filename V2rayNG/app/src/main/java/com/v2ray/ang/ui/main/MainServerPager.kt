@@ -150,6 +150,13 @@ private fun ServerListPage(
 
         LocateTargetEffect(locateTarget, rows, gridState, onLocateHandled)
 
+        if (rows.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                MainGroupEmptyState(isSearching = true)
+            }
+            return
+        }
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             state = gridState,
@@ -165,7 +172,7 @@ private fun ServerListPage(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            itemsIndexed(items = rows, key = { _, item -> item.guid }) { _, row ->
+            itemsIndexed(items = rows, key = { _, item -> item.guid }, contentType = { _, item -> item.profile.configType }) { _, row ->
                 val content: @Composable () -> Unit = {
                     ServerItemColumn(
                         row = row,
@@ -201,6 +208,13 @@ private fun ServerListPage(
 
         LocateTargetEffect(locateTarget, rows, listState, onLocateHandled)
 
+        if (rows.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                MainGroupEmptyState(isSearching = true)
+            }
+            return
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -214,7 +228,7 @@ private fun ServerListPage(
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            itemsIndexed(items = rows, key = { _, item -> item.guid }) { _, row ->
+            itemsIndexed(items = rows, key = { _, item -> item.guid }, contentType = { _, item -> item.profile.configType }) { _, row ->
                 if (canReorder && reorderableState != null) {
                     ReorderableItem(
                         reorderableState,

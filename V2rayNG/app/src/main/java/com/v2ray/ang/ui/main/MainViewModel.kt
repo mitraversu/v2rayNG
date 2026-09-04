@@ -45,9 +45,10 @@ class MainViewModel(
     private val dataSource: MainDataSource
 ) : BaseViewModel(application) {
 
+    // Mitra: faster feel — parallel preload, quicker filters
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
-    private val preloadDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val preloadDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(2)
 
     // ---------- UI state ----------
     private val _uiState = MutableStateFlow(
@@ -173,7 +174,7 @@ class MainViewModel(
                 .map { it.servers }
                 .stateIn(
                     scope = viewModelScope,
-                    started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+                    started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 2_000),
                     initialValue = groupState.value.servers,
                 )
         }
@@ -198,6 +199,7 @@ class MainViewModel(
             MainAction.RemoveAllServers -> removeAllServerAsync()
             MainAction.RemoveDuplicateServers -> removeDuplicateServerAsync()
             MainAction.RemoveInvalidServers -> removeInvalidServerAsync()
+            is MainAction.RemoveByPort -> removeByPortAsync(action.ports)
             MainAction.SortByTestResults -> sortByTestResultsAsync()
             MainAction.UpdateSubscriptions -> importConfigViaSub()
             MainAction.ExportAll -> exportAllAsync()
@@ -237,7 +239,7 @@ class MainViewModel(
         viewModelScope.launch(preloadDispatcher) {
             try {
                 initialPageReady.await()
-                delay(32)
+                delay(8)
                 dataSource.initAssets()
                 dataSource.syncSubscriptions()
             } catch (cancelled: CancellationException) {
@@ -404,7 +406,7 @@ class MainViewModel(
                 preloadJob = viewModelScope.launch(preloadDispatcher) {
                     preloadOrder.forEach { groupId ->
                         ensureActive()
-                        delay(32)
+                        delay(8)
                         val servers = loadGroup(groupId, forceRefresh)
                         updateGroupUi(groupId, servers)
                     }
@@ -594,6 +596,68 @@ class MainViewModel(
         }
     }
 
+    // Mitra: professional port filter — delete by ports in current visible group
+    private fun removeByPortAsync(ports: Set<String>) {
+        val normalized = ports.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        if (normalized.isEmpty()) {
+            toastError(R.string.toast_failure)
+            return
+        }
+        launchLoading {
+            withContext(ioDispatcher) {
+                try {
+                    val groupId = uiState.value.selectedGroupId
+                    val isVisibleOnly = groupId.isNotEmpty() || keywordFilter.isNotBlank()
+                    val servers = if (isVisibleOnly) currentServers()
+                    else {
+                        // all servers across all groups when on "All" and no search
+                        cacheMutex.withLock { groupDataCache.values.flatten() }
+                            .ifEmpty { buildServersCache(dataSource.getServerGuidList("")) }
+                    }
+                    val selectedGuid = uiState.value.selectedGuid
+                    val toDelete = servers.filter { s ->
+                        val p = s.profile.serverPort?.trim().orEmpty()
+                        p in normalized && s.guid != selectedGuid
+                    }
+                    if (toDelete.isEmpty()) {
+                        toast(dataSource.getString(R.string.toast_no_matching_port, normalized.joinToString(", ")))
+                        return@withContext
+                    }
+                    // Optimistic: update UI instantly
+                    val toDeleteGuids = toDelete.map { it.guid }.toSet()
+                    // Remove from storage
+                    toDeleteGuids.forEach { dataSource.removeServer(it) }
+                    // Update cache + UI immediately for snappy feel
+                    cacheMutex.withLock { groupDataCache.clear() }
+                    setupGroupTab(forceRefresh = true)
+                    val joined = normalized.joinToString(", ")
+                    toast(dataSource.getString(R.string.title_port_filter_result, toDeleteGuids.size, joined))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    LogUtil.e(AppConfig.TAG, "Delete by port failed", e)
+                    toastError(R.string.toast_failure)
+                }
+            }
+        }
+    }
+
+    // Helper for dialog preview — counts without deleting
+    fun countByPort(ports: Set<String>): Int {
+        val normalized = ports.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        if (normalized.isEmpty()) return 0
+        val groupId = uiState.value.selectedGroupId
+        val isVisibleOnly = groupId.isNotEmpty() || keywordFilter.isNotBlank()
+        val servers = if (isVisibleOnly) {
+            // currentServers is already filtered by keyword — accurate preview
+            try { currentServers() } catch (_: Exception) { emptyList() }
+        } else {
+            // need cached or full list — cheap sync
+            runCatching { currentServers() }.getOrElse { emptyList() }
+        }
+        return servers.count { it.profile.serverPort?.trim() in normalized }
+    }
+
     private fun sortByTestResultsAsync() {
         launchLoading {
             withContext(ioDispatcher) {
@@ -657,7 +721,7 @@ class MainViewModel(
             }
             order.forEachIndexed { index, groupId ->
                 ensureActive()
-                if (index > 0) delay(32)
+                if (index > 0) delay(8)
                 updateGroupUi(groupId, loadGroup(groupId, forceRefresh = true))
             }
         }
@@ -668,7 +732,7 @@ class MainViewModel(
         keywordFilter = keyword
         filterJob?.cancel()
         filterJob = viewModelScope.launch(defaultDispatcher) {
-            delay(300)
+            delay(100)
             val snapshot = cacheMutex.withLock { groupDataCache.toMap() }
             ensureActive()
             snapshot.forEach { (groupId, servers) ->
