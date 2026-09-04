@@ -86,7 +86,39 @@ jobs:
         cd ${{ github.workspace }}/V2rayNG
         echo "sdk.dir=${ANDROID_HOME}" > local.properties
         chmod 755 gradlew
-        ./gradlew assembleDebug --stacktrace
+        set -o pipefail
+        ./gradlew assembleDebug --stacktrace 2>&1 | tee /tmp/build.log
+
+    - name: Create gist with build log on failure
+      if: failure()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "=== Build failed, creating gist ==="
+        tail -n 1000 /tmp/build.log > /tmp/tail.log || echo "no log" > /tmp/tail.log
+        cat /tmp/tail.log
+        # create gist via gh api
+        CONTENT=$(cat /tmp/tail.log)
+        # use jq to build JSON safely
+        JSON=$(jq -n --arg c "$CONTENT" '{public: false, description: "Mitra build log failure", files: {"build.log": {content: $c}}}')
+        echo "$JSON" | gh api gists --input - > /tmp/gist.json || echo "gist failed"
+        cat /tmp/gist.json || true
+        GIST_URL=$(jq -r '.html_url // empty' /tmp/gist.json 2>/dev/null || echo "")
+        echo "GIST_URL=$GIST_URL"
+        if [ -n "$GIST_URL" ]; then
+          echo "::notice::Build log gist: $GIST_URL"
+          echo "$GIST_URL" > /tmp/gist_url.txt
+        fi
+        # also copy full log as artifact for debugging (will be uploaded via gist, but also try artifact)
+        cp /tmp/build.log /tmp/build-full.log || true
+
+    - name: Upload build log artifact on failure
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: build-log
+        path: /tmp/build.log
+        if-no-files-found: warn
 
     - name: Upload Debug APKs
       uses: actions/upload-artifact@v7
