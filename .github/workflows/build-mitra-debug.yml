@@ -81,13 +81,52 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Build Debug APK (Mitra)
+    - name: Build Debug APK (Mitra) - arm64 only for artifact size
       run: |
         cd ${{ github.workspace }}/V2rayNG
         echo "sdk.dir=${ANDROID_HOME}" > local.properties
         chmod 755 gradlew
         set -o pipefail
-        ./gradlew assembleDebug --stacktrace 2>&1 | tee /tmp/build.log
+        ./gradlew assembleDebug -PABI_FILTERS=arm64-v8a --stacktrace 2>&1 | tee /tmp/build.log
+        echo "=== APKs produced ==="
+        find app/build/outputs -name "*.apk" -exec ls -lh {} \;
+
+    - name: Push arm64 APK to branch via git on success
+      if: success()
+      run: |
+        APK=$(find V2rayNG/app/build/outputs -name "*arm64*.apk" | head -n 1)
+        if [ -z "$APK" ]; then
+          APK=$(find V2rayNG/app/build/outputs -name "*.apk" | head -n 1)
+        fi
+        echo "APK=$APK"
+        ls -lh "$APK" || echo "no apk"
+        if [ -f "$APK" ]; then
+          SIZE=$(stat -c%s "$APK")
+          echo "SIZE=$SIZE"
+          if [ "$SIZE" -gt 95000000 ]; then
+            echo "APK too large for git (>95MB), gzip compressing"
+            gzip -c "$APK" > /tmp/mitra-arm64.apk.gz
+            APK_TO_PUSH="/tmp/mitra-arm64.apk.gz"
+            DEST="mitra-arm64.apk.gz"
+          else
+            APK_TO_PUSH="$APK"
+            DEST="mitra-universal-debug.apk"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # create orphan branch for apk
+          git fetch origin arena/apk-artifact 2>/dev/null || true
+          git checkout -B arena/apk-artifact
+          cp "$APK_TO_PUSH" ./$DEST
+          # also copy build log tail for reference
+          cp /tmp/build.log ./build.log 2>/dev/null || true
+          tail -n 200 /tmp/build.log > ./build-tail.log 2>/dev/null || true
+          git add $DEST build.log build-tail.log 2>/dev/null || git add $DEST
+          git commit -m "apk artifact ${{ github.run_id }} $(basename $DEST) [skip ci]" || echo "no commit"
+          git push --force origin arena/apk-artifact || echo "push failed"
+        else
+          echo "No APK found to push"
+        fi
 
     - name: Push build log via API on failure
       if: failure()
