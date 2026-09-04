@@ -13,6 +13,22 @@ sealed interface MainStatus {
     data class ConnectionTest(val result: ConnectionTestResult) : MainStatus
 }
 
+enum class LatencyFilter {
+    All, Good, Okay, Slow, Failed, Untested
+}
+
+data class TestSummary(
+    val total: Int = 0,
+    val success: Int = 0,
+    val failed: Int = 0,
+    val untested: Int = 0,
+    val bestDelay: Long = -1,
+    val bestRemarks: String = "",
+    val medianDelay: Long = -1,
+    val worstDelay: Long = -1,
+    val groupId: String = ""
+)
+
 /**
  * Main UI state
  */
@@ -26,7 +42,13 @@ data class MainUiState(
     val locateTarget: LocateTarget? = null,
     val confirmRemove: Boolean = false,
     val doubleColumnDisplay: Boolean = false,
-    val shareQRCodeBitmap: android.graphics.Bitmap? = null
+    val shareQRCodeBitmap: android.graphics.Bitmap? = null,
+    // Mitra testing HUD
+    val testingGroupId: String? = null,
+    val testTotal: Int = 0,
+    val testDone: Int = 0,
+    val latencyFilter: LatencyFilter = LatencyFilter.All,
+    val lastTestSummary: TestSummary? = null
 )
 
 /**
@@ -68,4 +90,8 @@ sealed interface MainAction {
     data class ImportBatchConfig(val configText: String) : MainAction
 
     data object LocateHandled : MainAction
+    // Mitra testing + filter
+    data class SetLatencyFilter(val filter: LatencyFilter) : MainAction
+    data object TestFailedOnly : MainAction
+    data object DismissTestSummary : MainAction
 }

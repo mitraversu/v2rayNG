@@ -61,9 +61,11 @@ class MainViewModel(
     )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    // ---------- Keyword filtering ----------
+    // ---------- Filtering ----------
     @Volatile
     private var keywordFilter: String = ""
+    @Volatile
+    private var latencyFilter: LatencyFilter = LatencyFilter.All
     private var filterJob: Job? = null
 
     // ---------- Groups & cache ----------
@@ -122,11 +124,25 @@ class MainViewModel(
                     val gid = testingGroupId ?: uiState.value.selectedGroupId
                     cacheMutex.withLock { groupDataCache.remove(gid) }
                     updateGroupUi(gid, loadGroup(gid, forceRefresh = true))
+                    // HUD live count: each success = one done
+                    _uiState.update { s ->
+                        if (s.isTesting) s.copy(testDone = (s.testDone + 1).coerceAtMost(s.testTotal)) else s
+                    }
                 }
             }
 
             is MainServiceEvent.MeasureConfigNotify -> {
+                // keep original status for bottom bar + also update HUD fraction if parseable
                 _uiState.update { it.copy(status = MainStatus.TestProgress(event.progress)) }
+                // Try parse "3 / 5" remaining → done = total - remaining
+                val parts = event.progress.split("/").map { it.trim() }
+                if (parts.size == 2) {
+                    val left = parts[0].toIntOrNull()
+                    val total = parts[1].toIntOrNull()
+                    if (left != null && total != null && total > 0) {
+                        // left is remaining running, total remaining -> not useful; keep done increment via Success only
+                    }
+                }
             }
 
             is MainServiceEvent.MeasureConfigFinish -> {
@@ -195,6 +211,9 @@ class MainViewModel(
             MainAction.RefreshGroups -> setupGroupTab(forceRefresh = true)
             MainAction.TestAllServers -> testAllRealPing(true)
             MainAction.TestRealAllServers -> testAllRealPing()
+            is MainAction.SetLatencyFilter -> setLatencyFilter(action.filter)
+            MainAction.TestFailedOnly -> testFailedOnly()
+            MainAction.DismissTestSummary -> _uiState.update { it.copy(lastTestSummary = null) }
             MainAction.CancelTesting -> cancelAllPing()
             MainAction.RemoveAllServers -> removeAllServerAsync()
             MainAction.RemoveDuplicateServers -> removeDuplicateServerAsync()
@@ -305,12 +324,66 @@ class MainViewModel(
         }
     }
 
+    private fun applyLatencyFilter(servers: List<ServersCache>): List<ServersCache> {
+        return when (latencyFilter) {
+            LatencyFilter.All -> servers
+            LatencyFilter.Good -> servers.filter { it.testDelayMillis in 1..99 }
+            LatencyFilter.Okay -> servers.filter { it.testDelayMillis in 100..299 }
+            LatencyFilter.Slow -> servers.filter { it.testDelayMillis >= 300 }
+            LatencyFilter.Failed -> servers.filter { it.testDelayMillis < 0 }
+            LatencyFilter.Untested -> servers.filter { it.testDelayMillis == 0L }
+        }
+    }
+
+    private fun applyFilters(servers: List<ServersCache>): List<ServersCache> {
+        return applyLatencyFilter(applyKeywordFilter(servers))
+    }
+
     private fun updateGroupUi(groupId: String, servers: List<ServersCache>) {
-        val filteredServers = applyKeywordFilter(servers)
+        val filteredServers = applyFilters(servers)
         mutableServerGroupState(groupId).value = ServerGroupUiState(
             servers = filteredServers,
             rows = buildServerRows(groupId, filteredServers)
         )
+    }
+
+    // For chips — counts before latency filter, after keyword filter
+    fun latencyCounts(groupId: String): Map<LatencyFilter, Int> {
+        // groupDataCache holds raw (unfiltered) servers; apply keyword only to get base for chip counts
+        val raw = groupDataCache[groupId]
+        val base = if (raw != null) {
+            applyKeywordFilter(raw)
+        } else {
+            // Fallback: derive from current UI if cache not yet loaded (e.g., initial load race)
+            // This is already latency-filtered, so counts will be approximate until cache fills
+            mutableServerGroupState(groupId).value.servers
+        }
+        val cAll = base.size
+        val cGood = base.count { it.testDelayMillis in 1..99 }
+        val cOkay = base.count { it.testDelayMillis in 100..299 }
+        val cSlow = base.count { it.testDelayMillis >= 300 }
+        val cFailed = base.count { it.testDelayMillis < 0 }
+        val cUntested = base.count { it.testDelayMillis == 0L }
+        return mapOf(
+            LatencyFilter.All to cAll,
+            LatencyFilter.Good to cGood,
+            LatencyFilter.Okay to cOkay,
+            LatencyFilter.Slow to cSlow,
+            LatencyFilter.Failed to cFailed,
+            LatencyFilter.Untested to cUntested
+        )
+    }
+
+    fun setLatencyFilter(filter: LatencyFilter) {
+        if (latencyFilter == filter) return
+        latencyFilter = filter
+        _uiState.update { it.copy(latencyFilter = filter) }
+        viewModelScope.launch(defaultDispatcher) {
+            val snapshot = cacheMutex.withLock { groupDataCache.toMap() }
+            snapshot.forEach { (groupId, servers) ->
+                updateGroupUi(groupId, servers)
+            }
+        }
     }
 
     private fun buildServerRows(groupId: String, servers: List<ServersCache>): List<ServerRowUiModel> {
@@ -742,6 +815,44 @@ class MainViewModel(
         }
     }
 
+    fun testFailedOnly() {
+        val groupId = uiState.value.selectedGroupId
+        val failedGuids = currentServers().filter { it.testDelayMillis < 0 }.map { it.guid }
+            .ifEmpty {
+                // fallback to raw cache keyword-filtered failed
+                val raw = runCatching { groupDataCache[groupId] ?: emptyList() }.getOrElse { emptyList() }
+                applyKeywordFilter(raw).filter { it.testDelayMillis < 0 }.map { it.guid }
+            }
+        if (failedGuids.isEmpty()) {
+            toast(R.string.toast_none_data)
+            return
+        }
+        // reuse testAllRealPing path but with explicit guids
+        dataSource.cancelAllPing()
+        testingGroupId = groupId
+        _uiState.update { it.copy(isTesting = true, testingGroupId = groupId, testTotal = failedGuids.size, testDone = 0, status = MainStatus.Testing) }
+        // clear only failed ones? keep others as is
+        viewModelScope.launch(ioDispatcher) {
+            dataSource.clearAllTestDelayResults(failedGuids)
+            // reset those rows to 0 for pulse
+            mutableServerGroupState(groupId).update { cur ->
+                val updateMap = failedGuids.toSet()
+                cur.copy(
+                    servers = cur.servers.map { if (it.guid in updateMap) it.copy(testDelayMillis = 0) else it },
+                    rows = cur.rows.map { if (it.guid in updateMap) it.copy(testDelayMillis = 0, pingHistory = emptyList()) else it }
+                )
+            }
+            dataSource.sendMsg2TestService(
+                TestServiceMessage(
+                    key = AppConfig.MSG_MEASURE_CONFIG_START,
+                    subscriptionId = groupId,
+                    serverGuids = failedGuids,
+                    onlyTcp = false
+                )
+            )
+        }
+    }
+
     fun updateSelectedGuid(guid: String) {
         dataSource.setSelectServer(guid)
         _uiState.update { it.copy(selectedGuid = guid) }
@@ -787,6 +898,9 @@ class MainViewModel(
         _uiState.update {
             it.copy(
                 isTesting = false,
+                testingGroupId = null,
+                testTotal = 0,
+                testDone = 0,
                 status = if (it.isRunning) MainStatus.Connected else MainStatus.Disconnected
             )
         }
@@ -797,7 +911,7 @@ class MainViewModel(
         val groupId = uiState.value.selectedGroupId
         val servers = currentServers()
         if (servers.isEmpty()) {
-            _uiState.update { it.copy(isTesting = false) }
+            _uiState.update { it.copy(isTesting = false, testingGroupId = null, testTotal = 0, testDone = 0) }
             return
         }
         val serverGuids = servers.map { it.guid }
@@ -809,7 +923,7 @@ class MainViewModel(
                 },
                 rows = current.rows.map { row ->
                     if (row.testDelayMillis == 0L) row
-                    else row.copy(testDelayMillis = 0L)
+                    else row.copy(testDelayMillis = 0L, pingHistory = emptyList())
                 }
             )
         }
@@ -817,6 +931,10 @@ class MainViewModel(
         _uiState.update {
             it.copy(
                 isTesting = true,
+                testingGroupId = groupId,
+                testTotal = serverGuids.size,
+                testDone = 0,
+                lastTestSummary = null,
                 status = MainStatus.Testing
             )
         }
@@ -827,7 +945,7 @@ class MainViewModel(
                 TestServiceMessage(
                     key = AppConfig.MSG_MEASURE_CONFIG_START,
                     subscriptionId = groupId,
-                    serverGuids = if (keywordFilter.isNotEmpty()) serverGuids else emptyList(),
+                    serverGuids = if (keywordFilter.isNotEmpty() || latencyFilter != LatencyFilter.All) serverGuids else emptyList(),
                     onlyTcp = onlyTcp
                 )
             )
@@ -841,11 +959,40 @@ class MainViewModel(
 
     private fun onTestsFinished() {
         viewModelScope.launch(ioDispatcher) {
+            // Build summary from current group before clearing cache (rows are already updated via per-result reloads)
+            val gid = testingGroupId ?: uiState.value.selectedGroupId
+            val snapshot = runCatching { groupDataCache[gid] ?: emptyList() }.getOrElse { emptyList() }
+            // Fallback to UI rows if cache empty (already filtered)
+            val allServers = if (snapshot.isNotEmpty()) applyKeywordFilter(snapshot) else mutableServerGroupState(gid).value.servers
+            // But after incremental per-result reloads, cache was removed then reloaded per success, so latest rows are in UI state
+            val uiRows = mutableServerGroupState(gid).value.servers
+            val total = _uiState.value.testTotal.takeIf { it > 0 } ?: uiRows.size
+            val successServers = uiRows.filter { it.testDelayMillis > 0 }
+            val failed = uiRows.count { it.testDelayMillis < 0 }
+            val untested = uiRows.count { it.testDelayMillis == 0L }
+            val sortedSuccess = successServers.sortedBy { it.testDelayMillis }
+            val best = sortedSuccess.firstOrNull()
+            val worst = sortedSuccess.lastOrNull()
+            val median = if (sortedSuccess.isNotEmpty()) sortedSuccess[sortedSuccess.size / 2].testDelayMillis else -1L
+            val summary = TestSummary(
+                total = total,
+                success = successServers.size,
+                failed = failed,
+                untested = untested,
+                bestDelay = best?.testDelayMillis ?: -1,
+                bestRemarks = best?.profile?.remarks ?: "",
+                medianDelay = median,
+                worstDelay = worst?.testDelayMillis ?: -1,
+                groupId = gid
+            )
             cacheMutex.withLock { groupDataCache.clear() }
             testingGroupId = null
             _uiState.update {
                 it.copy(
                     isTesting = false,
+                    testingGroupId = null,
+                    testDone = it.testTotal,
+                    lastTestSummary = summary,
                     status = if (it.isRunning) MainStatus.Connected else MainStatus.Disconnected
                 )
             }

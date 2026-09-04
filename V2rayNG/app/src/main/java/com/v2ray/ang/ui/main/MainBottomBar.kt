@@ -39,10 +39,10 @@ fun MainBottomBar(
     displayText: String,
     isRunning: Boolean,
     isDarkTheme: Boolean,
+    isTesting: Boolean = false,
     onAction: (MainAction) -> Unit
 ) {
-    // Minimal: no overlapping FAB, no divider line. Clean surfaceContainerLow with hairline border.
-    // Status dot + text on left, tonal FAB inline on right — calm, not neon.
+    // Mitra: when testing, FAB becomes Cancel (outline), dot pulses
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -56,13 +56,16 @@ fun MainBottomBar(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Status: dot + text — minimal indicator
         Box(
             Modifier
                 .size(8.dp)
                 .clip(CircleShape)
                 .background(
-                    if (isRunning) Color(0xFF0F7A5F) else MaterialTheme.colorScheme.outlineVariant
+                    when {
+                        isTesting -> Color(0xFF0F7A5F).copy(alpha = 0.9f)
+                        isRunning -> Color(0xFF0F7A5F)
+                        else -> MaterialTheme.colorScheme.outlineVariant
+                    }
                 )
         )
         Spacer(Modifier.width(10.dp))
@@ -72,30 +75,50 @@ fun MainBottomBar(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .weight(1f)
-                .clickable(onClick = { onAction(MainAction.TestCurrentServer) })
+                .clickable(enabled = !isTesting, onClick = { onAction(MainAction.TestCurrentServer) })
                 .semantics { contentDescription = displayText },
             maxLines = 1
         )
         Spacer(Modifier.width(16.dp))
-        FloatingActionButton(
-            onClick = { onAction(MainAction.ToggleService) },
-            modifier = Modifier.size(52.dp),
-            containerColor = if (isRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-            contentColor = if (isRunning) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
-            shape = RoundedCornerShape(16.dp),
-            elevation = FloatingActionButtonDefaults.elevation(
-                defaultElevation = 0.dp,
-                pressedElevation = 2.dp
-            )
-        ) {
-            Icon(
-                painter = if (isRunning) painterResource(R.drawable.ic_stop_24dp)
-                else painterResource(R.drawable.ic_play_24dp),
-                contentDescription = stringResource(
-                    if (isRunning) R.string.acc_stop else R.string.acc_start
-                ),
-                modifier = Modifier.size(22.dp)
-            )
+        if (isTesting) {
+            FloatingActionButton(
+                onClick = { onAction(MainAction.CancelTesting) },
+                modifier = Modifier.size(52.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(16.dp),
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 2.dp
+                )
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_stop_24dp),
+                    contentDescription = stringResource(R.string.action_cancel),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        } else {
+            FloatingActionButton(
+                onClick = { onAction(MainAction.ToggleService) },
+                modifier = Modifier.size(52.dp),
+                containerColor = if (isRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                contentColor = if (isRunning) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp),
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 2.dp
+                )
+            ) {
+                Icon(
+                    painter = if (isRunning) painterResource(R.drawable.ic_stop_24dp)
+                    else painterResource(R.drawable.ic_play_24dp),
+                    contentDescription = stringResource(
+                        if (isRunning) R.string.acc_stop else R.string.acc_start
+                    ),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }

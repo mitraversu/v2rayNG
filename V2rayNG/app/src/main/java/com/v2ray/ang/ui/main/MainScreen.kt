@@ -24,10 +24,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.v2ray.ang.dto.entities.ProfileItem
+import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.ui.compose.LocalDarkTheme
 import com.v2ray.ang.ui.compose.QRCodeDialog
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -59,6 +61,7 @@ fun MainScreen(
     var showDelInvalidConfirm by remember { mutableStateOf(false) }
     var showPortFilter by remember { mutableStateOf(false) }
     var showRemoveConfirm by remember { mutableStateOf<String?>(null) }
+    var historyTarget by remember { mutableStateOf<ServerRowUiModel?>(null) }
 
     var shareTarget by remember { mutableStateOf<Triple<String, ProfileItem, Boolean>?>(null) }
     val removeServer: (String) -> Unit = { guid ->
@@ -141,6 +144,33 @@ fun MainScreen(
     if (shareQRCodeBitmap != null) {
         QRCodeDialog(bitmap = shareQRCodeBitmap, onDismiss = { onAction(MainAction.DismissQRCodeDialog) })
     }
+    // History sheet
+    historyTarget?.let { row ->
+        val aff = MmkvManager.decodeServerAffiliationInfo(row.guid)
+        PingHistoryBottomSheet(
+            remarks = row.remarks,
+            history = aff?.pingHistory ?: row.pingHistory,
+            currentDelay = row.testDelayMillis,
+            typeDescription = row.typeDescription,
+            address = row.profile.server ?: "",
+            onDismiss = { historyTarget = null },
+            onClear = {
+                MmkvManager.clearAllTestDelayResults(listOf(row.guid))
+                mainViewModel.reloadServerList()
+                historyTarget = null
+            }
+        )
+    }
+    // Summary sheet
+    uiState.lastTestSummary?.let { summary ->
+        TestSummaryBottomSheet(
+            summary = summary,
+            onDismiss = { onAction(MainAction.DismissTestSummary) },
+            onSort = { onAction(MainAction.SortByTestResults) },
+            onRetryFailed = { onAction(MainAction.TestFailedOnly) },
+            onFilterFailed = { onAction(MainAction.SetLatencyFilter(LatencyFilter.Failed)) }
+        )
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -158,7 +188,7 @@ fun MainScreen(
             contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
             topBar = {
                 MainTopBar(
-                    isLoading = isLoading,
+                    isLoading = isLoading || uiState.isTesting,
                     showSearch = showSearch,
                     searchQuery = searchQuery,
                     onSearchQueryChange = { query: String ->
@@ -195,6 +225,7 @@ fun MainScreen(
                     displayText = displayText,
                     isRunning = isRunning,
                     isDarkTheme = isDarkTheme,
+                    isTesting = uiState.isTesting,
                     onAction = onAction
                 )
             },
@@ -214,6 +245,19 @@ fun MainScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
+                    // Mitra testing HUD — solid, not snackbar (above tabs so it's unmissable)
+                    if (uiState.isTesting) {
+                        val groupRemarks = groups.find { it.id == uiState.testingGroupId }?.remarks
+                            ?: groups.find { it.id == uiState.selectedGroupId }?.remarks
+                        TestingHud(
+                            isTesting = uiState.isTesting,
+                            testTotal = uiState.testTotal,
+                            testDone = uiState.testDone,
+                            statusText = displayText,
+                            testingGroupRemarks = groupRemarks,
+                            onCancel = { onAction(MainAction.CancelTesting) }
+                        )
+                    }
                     if (groups.size > 1) {
                         GroupTabBar(
                             groups = groups,
@@ -228,6 +272,17 @@ fun MainScreen(
                                 }
                             }
                         )
+                    }
+                    // Latency filter chips — sticky under GroupTabBar, shown when there's any tested result
+                    if (groups.isNotEmpty() && !uiState.isTesting) {
+                        val counts = mainViewModel.latencyCounts(uiState.selectedGroupId)
+                        if ((counts[LatencyFilter.Good] ?: 0) + (counts[LatencyFilter.Failed] ?: 0) + (counts[LatencyFilter.Slow] ?: 0) + (counts[LatencyFilter.Okay] ?: 0) > 0) {
+                            LatencyFilterChips(
+                                selected = uiState.latencyFilter,
+                                counts = counts,
+                                onSelected = { onAction(MainAction.SetLatencyFilter(it)) }
+                            )
+                        }
                     }
 
                     HorizontalPager(
@@ -246,6 +301,7 @@ fun MainScreen(
                             locateTarget = uiState.locateTarget,
                             doubleColumnDisplay = doubleColumnDisplay,
                             searchQuery = searchQuery,
+                            isTesting = uiState.isTesting && uiState.testingGroupId == group.id,
                             lazyListStates = lazyListStates,
                             lazyGridStates = lazyGridStates,
                             onSelectServer = { guid -> onAction(MainAction.SelectServer(guid)) },
@@ -257,6 +313,7 @@ fun MainScreen(
                                 shareTarget = Triple(guid, profile, true)
                             },
                             onRemoveServer = removeServer,
+                            onPingClick = { row -> historyTarget = row },
                             contentPadding = PaddingValues(
                                 start = 0.dp,
                                 top = 0.dp,

@@ -68,6 +68,7 @@ fun GroupPagerPage(
     locateTarget: LocateTarget?,
     doubleColumnDisplay: Boolean,
     searchQuery: String,
+    isTesting: Boolean = false,
     lazyListStates: MutableMap<String, LazyListState>,
     lazyGridStates: MutableMap<String, LazyGridState>,
     onSelectServer: (String) -> Unit,
@@ -75,13 +76,14 @@ fun GroupPagerPage(
     onShareServer: (String, ProfileItem) -> Unit,
     onMoreServer: (String, ProfileItem) -> Unit,
     onRemoveServer: (String) -> Unit,
+    onPingClick: (ServerRowUiModel) -> Unit = {},
     contentPadding: PaddingValues
 ) {
     val groupStateFlow = remember(groupId) {
         mainViewModel.serverGroupState(groupId)
     }
     val groupState by groupStateFlow.collectAsStateWithLifecycle()
-    val canReorder = groupId.isNotEmpty() && searchQuery.isEmpty()
+    val canReorder = groupId.isNotEmpty() && searchQuery.isEmpty() && !isTesting
     val actions = remember(
         onSelectServer,
         onEditServer,
@@ -104,6 +106,7 @@ fun GroupPagerPage(
         canReorder = canReorder,
         doubleColumnDisplay = doubleColumnDisplay,
         groupId = groupId,
+        isTesting = isTesting,
         lazyListStates = lazyListStates,
         lazyGridStates = lazyGridStates,
         actions = actions,
@@ -111,6 +114,7 @@ fun GroupPagerPage(
         onMoveServer = { fromIndex, toIndex ->
             mainViewModel.moveServer(groupId, fromIndex, toIndex)
         },
+        onPingClick = onPingClick,
         contentPadding = contentPadding
     )
 }
@@ -131,11 +135,13 @@ private fun ServerListPage(
     canReorder: Boolean,
     doubleColumnDisplay: Boolean,
     groupId: String,
+    isTesting: Boolean = false,
     lazyListStates: MutableMap<String, LazyListState>,
     lazyGridStates: MutableMap<String, LazyGridState>,
     actions: ServerRowActions,
     onLocateHandled: () -> Unit,
     onMoveServer: (Int, Int) -> Unit,
+    onPingClick: (ServerRowUiModel) -> Unit = {},
     contentPadding: PaddingValues
 ) {
     if (doubleColumnDisplay) {
@@ -173,12 +179,15 @@ private fun ServerListPage(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             itemsIndexed(items = rows, key = { _, item -> item.guid }, contentType = { _, item -> item.profile.configType }) { _, row ->
+                val isTestingRow = isTesting && row.testDelayMillis == 0L
                 val content: @Composable () -> Unit = {
                     ServerItemColumn(
                         row = row,
                         isSelected = row.guid == selectedGuid,
                         doubleColumnDisplay = true,
-                        actions = actions
+                        actions = actions,
+                        isTesting = isTesting,
+                        onPingClick = onPingClick
                     )
                 }
                 if (canReorder && reorderableGridState != null) {
@@ -241,7 +250,9 @@ private fun ServerListPage(
                             ServerItemRow(
                                 row = row,
                                 isSelected = row.guid == selectedGuid,
-                                actions = actions
+                                actions = actions,
+                                isTesting = isTesting,
+                                onPingClick = onPingClick
                             )
                         }
                     }
@@ -249,7 +260,9 @@ private fun ServerListPage(
                     ServerItemRow(
                         row = row,
                         isSelected = row.guid == selectedGuid,
-                        actions = actions
+                        actions = actions,
+                        isTesting = isTesting,
+                        onPingClick = onPingClick
                     )
                 }
             }
@@ -293,13 +306,17 @@ private fun LocateTargetEffect(
 private fun ServerItemRow(
     row: ServerRowUiModel,
     isSelected: Boolean,
-    actions: ServerRowActions
+    actions: ServerRowActions,
+    isTesting: Boolean = false,
+    onPingClick: (ServerRowUiModel) -> Unit = {}
 ) {
     ServerListItem(
         row = row,
         isSelected = isSelected,
         doubleColumnDisplay = false,
-        actions = actions
+        isTestingRow = isTesting && row.testDelayMillis == 0L,
+        actions = actions,
+        onPingClick = onPingClick
     )
 }
 
@@ -308,13 +325,17 @@ private fun ServerItemColumn(
     row: ServerRowUiModel,
     isSelected: Boolean,
     doubleColumnDisplay: Boolean,
-    actions: ServerRowActions
+    actions: ServerRowActions,
+    isTesting: Boolean = false,
+    onPingClick: (ServerRowUiModel) -> Unit = {}
 ) {
     ServerListItem(
         row = row,
         isSelected = isSelected,
         doubleColumnDisplay = doubleColumnDisplay,
-        actions = actions
+        isTestingRow = isTesting && row.testDelayMillis == 0L,
+        actions = actions,
+        onPingClick = onPingClick
     )
 }
 
@@ -323,19 +344,23 @@ private fun ServerListItem(
     row: ServerRowUiModel,
     isSelected: Boolean,
     doubleColumnDisplay: Boolean,
-    actions: ServerRowActions
+    actions: ServerRowActions,
+    isTestingRow: Boolean = false,
+    onPingClick: (ServerRowUiModel) -> Unit = {}
 ) {
     val testResult = if (row.testDelayMillis == 0L) "" else stringResource(R.string.server_test_delay_value, row.testDelayMillis)
     val isError = row.testDelayMillis < 0L
     val hasPing = row.testDelayMillis != 0L
     val selectedDesc = if (isSelected) stringResource(R.string.acc_selected_server) else null
 
-    // Minimal card: generous whitespace, rounded 16dp, subtle border, no dividers
     val cardShape = RoundedCornerShape(16.dp)
     val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
     else MaterialTheme.colorScheme.surfaceContainerLow
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    val borderColor = when {
+        isTestingRow -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    }
 
     Row(
         modifier = Modifier
@@ -348,7 +373,6 @@ private fun ServerListItem(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Selection dot — minimal 8dp, not a 4dp bar
         Box(
             Modifier
                 .size(8.dp)
@@ -361,7 +385,6 @@ private fun ServerListItem(
         Spacer(Modifier.width(12.dp))
 
         Column(Modifier.weight(1f)) {
-            // Title row: badge + remarks + overflow
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (row.subscriptionBadge.isNotBlank()) {
                     Box(
@@ -403,12 +426,10 @@ private fun ServerListItem(
 
             Spacer(Modifier.height(8.dp))
 
-            // Bottom row: protocol capsule + minimal 1px sparkline + ping pill
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Protocol — subtle surfaceContainerHigh capsule
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(100.dp))
@@ -426,24 +447,46 @@ private fun ServerListItem(
                         maxLines = 1
                     )
                 }
-                // Mitra minimal sparkline — 1px thin line, only if history exists
+                // Sparkline tappable -> history
                 if (row.pingHistory.size >= 2) {
                     Spacer(Modifier.width(8.dp))
-                    SparklineOrDot(
-                        values = row.pingHistory,
-                        modifier = Modifier
-                            .width(56.dp)
-                            .height(14.dp)
-                    )
+                    Box(Modifier.clickable { onPingClick(row) }) {
+                        SparklineOrDot(
+                            values = row.pingHistory,
+                            modifier = Modifier
+                                .width(56.dp)
+                                .height(14.dp)
+                        )
+                    }
                 } else if (row.pingHistory.size == 1) {
                     Spacer(Modifier.width(8.dp))
-                    SparklineOrDot(
-                        values = row.pingHistory,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    Box(Modifier.clickable { onPingClick(row) }) {
+                        SparklineOrDot(
+                            values = row.pingHistory,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
                 Spacer(Modifier.weight(1f))
-                if (hasPing) {
+                if (isTestingRow) {
+                    // Mitra pulse pill
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(100.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), RoundedCornerShape(100.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(10.dp), strokeWidth = 1.2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("…", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                } else if (hasPing) {
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(100.dp))
@@ -451,6 +494,7 @@ private fun ServerListItem(
                                 if (isError) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
                                 else colorPing.copy(alpha = 0.12f)
                             )
+                            .clickable { onPingClick(row) }
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
@@ -462,13 +506,23 @@ private fun ServerListItem(
                             color = if (isError) MaterialTheme.colorScheme.onErrorContainer else colorPing
                         )
                     }
+                } else if (row.pingHistory.isNotEmpty()) {
+                    // has history but untested currently? still allow tap
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(100.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .clickable { onPingClick(row) }
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text("history", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
 
         Spacer(Modifier.width(8.dp))
 
-        // Minimal overflow — single icon, not 3. Keeps card clean.
         IconButton(
             onClick = { actions.more(row.guid, row.profile) },
             modifier = Modifier.size(36.dp)
