@@ -93,7 +93,9 @@ jobs:
 
     - name: Push arm64 APK to branch via git on success
       if: success()
+      continue-on-error: true
       run: |
+        set -x
         APK=$(find V2rayNG/app/build/outputs -name "*arm64*.apk" | head -n 1)
         if [ -z "$APK" ]; then
           APK=$(find V2rayNG/app/build/outputs -name "*.apk" | head -n 1)
@@ -110,20 +112,18 @@ jobs:
             DEST="mitra-arm64.apk.gz"
           else
             APK_TO_PUSH="$APK"
-            DEST="mitra-universal-debug.apk"
+            DEST="mitra-arm64-debug.apk"
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # create orphan branch for apk
-          git fetch origin arena/apk-artifact 2>/dev/null || true
-          git checkout -B arena/apk-artifact
+          git fetch origin arena/apk-artifact 2>/dev/null || echo "fetch no branch yet"
+          git checkout -B arena/apk-artifact || git checkout --orphan arena/apk-artifact
           cp "$APK_TO_PUSH" ./$DEST
-          # also copy build log tail for reference
           cp /tmp/build.log ./build.log 2>/dev/null || true
           tail -n 200 /tmp/build.log > ./build-tail.log 2>/dev/null || true
           git add $DEST build.log build-tail.log 2>/dev/null || git add $DEST
           git commit -m "apk artifact ${{ github.run_id }} $(basename $DEST) [skip ci]" || echo "no commit"
-          git push --force origin arena/apk-artifact || echo "push failed"
+          git push --force origin arena/apk-artifact 2>&1 | tail -n 20 || echo "push failed but continue"
         else
           echo "No APK found to push"
         fi
