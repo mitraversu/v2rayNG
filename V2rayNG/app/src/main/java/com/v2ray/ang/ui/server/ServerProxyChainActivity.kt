@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
+import com.v2ray.ang.extension.isGroupType
 import com.v2ray.ang.extension.moveItem
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastSuccess

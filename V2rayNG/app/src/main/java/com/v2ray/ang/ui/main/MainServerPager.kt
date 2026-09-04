@@ -61,7 +61,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.math.abs
 
 @Composable
-fun GroupPagerPage(
+internal fun GroupPagerPage(
     groupId: String,
     mainViewModel: MainViewModel,
     selectedGuid: String?,
