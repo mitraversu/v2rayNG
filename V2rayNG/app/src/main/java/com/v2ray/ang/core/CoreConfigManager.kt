@@ -306,6 +306,7 @@ object CoreConfigManager {
 
     /**
      * Build and insert a multi-hop chain entry.
+     * Mitra: supports CUSTOM in chains (issue #6182) via raw JSON extraction.
      */
     private fun handleProxyChainResolvedOutbound(
         resolvedOutbound: CoreConfigContext.ResolvedOutbound,
@@ -314,7 +315,7 @@ object CoreConfigManager {
         v2rayConfig: V2rayConfig,
     ) {
         val chainOutbounds = resolvedOutbound.resolvedProfiles
-            .mapNotNull { convertProfile2Outbound(it) }
+            .mapNotNull { convertChainProfile(it) }
             .toMutableList()
         if (chainOutbounds.isEmpty()) {
             LogUtil.w(AppConfig.TAG, "PROXYCHAIN resolved outbound '${resolvedOutbound.tag}' has no valid profiles, skipping")
@@ -1107,6 +1108,36 @@ object CoreConfigManager {
      */
     private fun convertProfile2Outbound(profileItem: ProfileItem): V2rayConfig.OutboundBean? {
         return CoreOutboundBuilder.convert(profileItem)
+    }
+
+    /**
+     * Mitra: convert chain profile including CUSTOM (issue #6182).
+     * Custom raw is a full Xray JSON — extract first outbound.
+     */
+    private fun convertChainProfile(profile: ProfileItem): V2rayConfig.OutboundBean? {
+        if (profile.configType == EConfigType.CUSTOM) {
+            val guid = MmkvManager.decodeAllServerList().firstOrNull { g ->
+                val p = MmkvManager.decodeServerConfig(g)
+                p?.remarks == profile.remarks && p.configType == EConfigType.CUSTOM
+            } ?: return null
+            val raw = MmkvManager.decodeServerRaw(guid) ?: return null
+            // Primary: parse as V2rayConfig and take first outbound
+            JsonUtil.fromJsonSafe(raw, V2rayConfig::class.java)?.outbounds?.firstOrNull()?.let { ob ->
+                return JsonUtil.fromJson(JsonUtil.toJson(ob), V2rayConfig.OutboundBean::class.java)
+            }
+            // Fallback: raw is directly an outbound JSON
+            JsonUtil.fromJsonSafe(raw, V2rayConfig.OutboundBean::class.java)?.let { return it }
+            try {
+                val json = JsonUtil.parseString(raw)?.takeIf { it.isJsonObject }?.asJsonObject
+                json?.get("outbounds")?.takeIf { it.isJsonArray }?.asJsonArray?.firstOrNull()?.let { elem ->
+                    return JsonUtil.fromJson(JsonUtil.toJson(elem), V2rayConfig.OutboundBean::class.java)
+                }
+            } catch (_: Exception) {
+            }
+            LogUtil.w(AppConfig.TAG, "Failed to extract outbound from CUSTOM chain member '${profile.remarks}'")
+            return null
+        }
+        return convertProfile2Outbound(profile)
     }
 
     //endregion

@@ -2,23 +2,32 @@ package com.v2ray.ang.ui.server
 
 import android.os.Bundle
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,13 +42,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
-import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.moveItem
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastSuccess
@@ -73,8 +83,9 @@ class ServerProxyChainActivity : BaseComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Mitra: allow CUSTOM in chains (issue #6182) — power beast
         allRemarks = SettingsManager.getProfileRemarks(
-            excludeConfigTypes = setOf(EConfigType.CUSTOM, EConfigType.POLICYGROUP, EConfigType.PROXYCHAIN)
+            excludeConfigTypes = setOf(EConfigType.POLICYGROUP, EConfigType.PROXYCHAIN)
         )
         val config = MmkvManager.decodeServerConfig(editGuid)
         initialRemarks = config?.remarks ?: ""
@@ -118,9 +129,10 @@ class ServerProxyChainActivity : BaseComponentActivity() {
             return false
         }
 
+        // Mitra: allow CUSTOM as chain member — only block groups
         val invalidMembers = chainMembers.filter { member ->
             val profile = SettingsManager.getServerViaRemarks(member)
-            profile == null || profile.configType.isComplexType()
+            profile == null || profile.configType.isGroupType()
         }
 
         if (invalidMembers.isNotEmpty()) {
@@ -245,11 +257,13 @@ fun ProxyChainScreen(
                     members = members + ""
                     memberKeys = memberKeys + UUID.randomUUID().toString()
                 },
-                modifier = Modifier
-                    .offset(y = -20.dp)
-                    .navigationBarsPadding()
+                modifier = Modifier.navigationBarsPadding(),
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                elevation = FloatingActionButtonDefaults.elevation(0.dp, 2.dp)
             ) {
-                Icon(painterResource(R.drawable.ic_add_24dp), contentDescription = stringResource(R.string.acc_add_member))
+                Icon(painterResource(R.drawable.ic_add_24dp), contentDescription = stringResource(R.string.acc_add_member), modifier = Modifier.size(22.dp))
             }
         }
     ) { innerPadding ->
@@ -279,30 +293,50 @@ fun ProxyChainScreen(
             item {
                 Text(
                     text = stringResource(R.string.server_proxy_chain_members),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp)
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp)
                 )
             }
 
             itemsIndexed(items = members, key = { index, _ -> memberKeys[index] }) { index, member ->
                 ReorderableItem(reorderableState, key = memberKeys[index]) { isDragging ->
                     val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
-                    Surface(shadowElevation = elevation) {
+                    Surface(
+                        shadowElevation = elevation,
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 0.dp
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                    RoundedCornerShape(16.dp)
+                                )
                                 .then(with(this) { reorderableDragHandle() })
-                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "${index + 1}",
+                            // Minimal number circle
+                            Box(
                                 modifier = Modifier
-                                    .padding(start = 16.dp)
-                                    .width(10.dp)
-                            )
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "${index + 1}",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
                             FormDropdownField(
-                                label = stringResource(R.string.server_lab_remarks),
+                                label = "",
                                 placeholder = stringResource(R.string.server_proxy_chain_member_unselected),
                                 value = member,
                                 options = allRemarks,
@@ -319,14 +353,26 @@ fun ProxyChainScreen(
                                 } else {
                                     memberToDeleteIndex = index
                                 }
-                            }) {
+                            }, modifier = Modifier.size(36.dp)) {
                                 Icon(
                                     painterResource(R.drawable.ic_delete_24dp),
-                                    contentDescription = stringResource(R.string.acc_remove)
+                                    contentDescription = stringResource(R.string.acc_remove),
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
                             }
                         }
                     }
+                }
+                // Minimal vertical spacing + subtle connector
+                if (index < members.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 26.dp, top = 4.dp, bottom = 4.dp)
+                            .size(width = 2.dp, height = 12.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    )
                 }
             }
         }

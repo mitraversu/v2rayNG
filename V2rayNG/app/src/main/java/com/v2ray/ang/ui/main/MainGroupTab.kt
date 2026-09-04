@@ -34,14 +34,18 @@ fun GroupTabBar(
         selectedTabIndex = selectedIndex,
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)),
-        edgePadding = 16.dp,
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+        edgePadding = 12.dp,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         indicator = { tabPositions ->
             TabRowDefaults.SecondaryIndicator(
                 modifier = Modifier.tabIndicatorOffset(tabPositions[selectedIndex]),
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.primary,
+                height = 2.dp
             )
-        }
+        },
+        divider = {}
     ) {
         groups.forEachIndexed { index, group ->
             val serverFlow = remember(group.id, mainViewModel) {
@@ -76,13 +80,18 @@ private fun GroupTabItem(
         onClick = onClick,
         modifier = Modifier
             .widthIn(min = 56.dp)
-            .heightIn(min = 48.dp),
+            .heightIn(min = 44.dp),
+        selectedContentColor = MaterialTheme.colorScheme.primary,
+        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         text = {
             Text(
                 text = text,
                 maxLines = 1,
                 softWrap = false,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                style = if (selected) MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                ) else MaterialTheme.typography.bodyMedium
             )
         }
     )

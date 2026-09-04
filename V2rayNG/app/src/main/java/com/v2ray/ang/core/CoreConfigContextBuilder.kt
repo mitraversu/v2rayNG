@@ -183,12 +183,16 @@ object CoreConfigContextBuilder {
         }
 
         try {
+            // Mitra: allow CUSTOM in chains (issue #6182) — power beast
             return config.proxyChainProfiles.orEmpty().split(",")
                 .asSequence()
                 .mapNotNull { remark -> SettingsManager.getServerViaRemarks(remark) }
-                .filter { it.server.isNotNullEmpty() }
-                .filter { Utils.isPureIpAddress(it.server!!) || Utils.isValidUrl(it.server!!) }
-                .filter { !it.configType.isComplexType() }
+                .filter { profile ->
+                    if (profile.configType == EConfigType.CUSTOM) true
+                    else profile.server.isNotNullEmpty() &&
+                        (Utils.isPureIpAddress(profile.server!!) || Utils.isValidUrl(profile.server!!)) &&
+                        !profile.configType.isGroupType()
+                }
                 .toList()
                 .reversed()
         } catch (e: Exception) {

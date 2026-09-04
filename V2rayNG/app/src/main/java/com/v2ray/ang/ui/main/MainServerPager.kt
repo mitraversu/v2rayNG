@@ -1,15 +1,14 @@
 package com.v2ray.ang.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,12 +18,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +42,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,10 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.LocateTarget
 import com.v2ray.ang.dto.entities.ProfileItem
-import com.v2ray.ang.ui.compose.ItemDivider
 import com.v2ray.ang.ui.compose.ReorderableGridItem
 import com.v2ray.ang.ui.compose.ReorderableListItem
-import com.v2ray.ang.ui.compose.colorConfigType
 import com.v2ray.ang.ui.compose.colorPing
 import com.v2ray.ang.ui.compose.colorPingRed
 import com.v2ray.ang.ui.compose.verticalScrollbar
@@ -157,7 +155,14 @@ private fun ServerListPage(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScrollbar(gridState),
-            contentPadding = contentPadding
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                top = 12.dp,
+                end = 12.dp,
+                bottom = contentPadding.calculateBottomPadding() + 12.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             itemsIndexed(items = rows, key = { _, item -> item.guid }) { _, row ->
                 val content: @Composable () -> Unit = {
@@ -200,7 +205,13 @@ private fun ServerListPage(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScrollbar(listState),
-            contentPadding = contentPadding
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                top = 12.dp,
+                end = 12.dp,
+                bottom = contentPadding.calculateBottomPadding() + 12.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             itemsIndexed(items = rows, key = { _, item -> item.guid }) { _, row ->
                 if (canReorder && reorderableState != null) {
@@ -218,7 +229,6 @@ private fun ServerListPage(
                                 actions = actions
                             )
                         }
-                        ItemDivider()
                     }
                 } else {
                     ServerItemRow(
@@ -226,7 +236,6 @@ private fun ServerListPage(
                         isSelected = row.guid == selectedGuid,
                         actions = actions
                     )
-                    ItemDivider()
                 }
             }
         }
@@ -286,15 +295,12 @@ private fun ServerItemColumn(
     doubleColumnDisplay: Boolean,
     actions: ServerRowActions
 ) {
-    Column {
-        ServerListItem(
-            row = row,
-            isSelected = isSelected,
-            doubleColumnDisplay = doubleColumnDisplay,
-            actions = actions
-        )
-        ItemDivider()
-    }
+    ServerListItem(
+        row = row,
+        isSelected = isSelected,
+        doubleColumnDisplay = doubleColumnDisplay,
+        actions = actions
+    )
 }
 
 @Composable
@@ -304,111 +310,145 @@ private fun ServerListItem(
     doubleColumnDisplay: Boolean,
     actions: ServerRowActions
 ) {
-    val testResult = if (row.testDelayMillis == 0L) {
-        ""
-    } else {
-        stringResource(R.string.server_test_delay_value, row.testDelayMillis)
-    }
-    val selectedStateDescription = if (isSelected) {
-        stringResource(R.string.acc_selected_server)
-    } else {
-        null
-    }
+    val testResult = if (row.testDelayMillis == 0L) "" else stringResource(R.string.server_test_delay_value, row.testDelayMillis)
+    val isError = row.testDelayMillis < 0L
+    val hasPing = row.testDelayMillis != 0L
+    val selectedDesc = if (isSelected) stringResource(R.string.acc_selected_server) else null
+
+    // Minimal card: generous whitespace, rounded 16dp, subtle border, no dividers
+    val cardShape = RoundedCornerShape(16.dp)
+    val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+    else MaterialTheme.colorScheme.surfaceContainerLow
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min)
-            .semantics {
-                if (selectedStateDescription != null) {
-                    stateDescription = selectedStateDescription
-                }
-            }
+            .clip(cardShape)
+            .background(bg)
+            .border(1.dp, borderColor, cardShape)
+            .semantics { if (selectedDesc != null) stateDescription = selectedDesc }
             .clickable { actions.select(row.guid) }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Selection dot — minimal 8dp, not a 4dp bar
         Box(
             Modifier
-                .width(10.dp)
-                .fillMaxHeight()
-        ) {
-            if (isSelected) {
-                Row {
-                    Spacer(Modifier.width(6.dp))
-                    Box(
-                        Modifier
-                            .width(4.dp)
-                            .fillMaxHeight()
-                            .padding(vertical = 10.dp)
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                }
-            }
-        }
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+        )
+        Spacer(Modifier.width(12.dp))
 
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(row.remarks, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge.copy(lineBreak = LineBreak.Paragraph), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (doubleColumnDisplay) {
-                    IconButton(onClick = { actions.more(row.guid, row.profile) }, Modifier.size(36.dp)) {
-                        Icon(
-                            painterResource(R.drawable.ic_more_vert_24dp),
-                            stringResource(R.string.acc_more),
-                            Modifier.size(24.dp)
-                        )
-                    }
-                } else {
-                    IconButton(onClick = { actions.share(row.guid, row.profile) }, Modifier.size(36.dp)) {
-                        Icon(
-                            painterResource(R.drawable.ic_share_24dp),
-                            stringResource(R.string.title_configuration_share),
-                            Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = { actions.edit(row.guid, row.profile) }, Modifier.size(36.dp)) {
-                        Icon(
-                            painterResource(R.drawable.ic_edit_24dp),
-                            stringResource(R.string.acc_edit),
-                            Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = { actions.remove(row.guid) }, Modifier.size(36.dp)) {
-                        Icon(
-                            painterResource(R.drawable.ic_delete_24dp),
-                            stringResource(R.string.acc_delete),
-                            Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
+        Column(Modifier.weight(1f)) {
+            // Title row: badge + remarks + overflow
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (row.subscriptionBadge.isNotBlank()) {
                     Box(
                         Modifier
-                            .size(24.dp)
+                            .size(20.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)), Alignment.Center
+                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(row.subscriptionBadge.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            row.subscriptionBadge.uppercase(),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
+                    Spacer(Modifier.width(8.dp))
                 }
                 Text(
-                    row.statistics,
+                    row.remarks.ifBlank { stringResource(R.string.title_server) },
                     Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            if (row.statistics.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    row.statistics,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(row.typeDescription, style = MaterialTheme.typography.bodySmall, color = colorConfigType, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(testResult, style = MaterialTheme.typography.bodySmall, color = if (row.testDelayMillis < 0L) colorPingRed else colorPing, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+            Spacer(Modifier.height(8.dp))
+
+            // Bottom row: protocol chip + ping pill — minimal capsules
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Protocol — subtle surfaceContainerHigh capsule
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(100.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        row.typeDescription,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.2.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+                if (hasPing) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(100.dp))
+                            .background(
+                                if (isError) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
+                                else colorPing.copy(alpha = 0.12f)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            if (isError) "—" else testResult,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = if (isError) MaterialTheme.colorScheme.onErrorContainer else colorPing
+                        )
+                    }
+                }
             }
+        }
+
+        Spacer(Modifier.width(8.dp))
+
+        // Minimal overflow — single icon, not 3. Keeps card clean.
+        IconButton(
+            onClick = { actions.more(row.guid, row.profile) },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_more_vert_24dp),
+                contentDescription = stringResource(R.string.acc_more),
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
         }
     }
 }

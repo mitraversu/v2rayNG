@@ -102,10 +102,10 @@ fun AppTopBar(
             },
             actions = actions,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-                actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
         AnimatedVisibility(
@@ -221,13 +221,17 @@ fun AppListItem(
 
 @Composable
 fun ItemDivider() {
-    AppDivider(modifier = Modifier.padding(horizontal = 12.dp))
+    AppDivider(modifier = Modifier.padding(horizontal = 16.dp))
 }
 
 @Composable
 fun AppDivider(modifier: Modifier = Modifier) {
-    val color = if (LocalDarkTheme.current) dividerColorDark else dividerColorLight
-    HorizontalDivider(modifier = modifier.fillMaxWidth(), thickness = 1.dp, color = color)
+    val base = if (LocalDarkTheme.current) dividerColorDark else dividerColorLight
+    HorizontalDivider(
+        modifier = modifier.fillMaxWidth(),
+        thickness = 0.6.dp,
+        color = base.copy(alpha = 0.6f)
+    )
 }
 
 @Composable
