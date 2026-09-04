@@ -8,7 +8,6 @@ import com.v2ray.ang.R
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.toast
-import com.v2ray.ang.ui.compose.FormTextField
 
 class ServerTrojanActivity : BaseServerActivity() {
 
@@ -56,11 +55,12 @@ class ServerTrojanActivity : BaseServerActivity() {
 
     @Composable
     private fun TrojanProtocolFields(state: ServerUiState) {
-        FormTextField(
-            stringResource(R.string.server_lab_id3),
-            state.password,
-            { state.password = it }
-        )
+        EditorSection(title = stringResource(R.string.server_section_credentials)) {
+            EditorTextField(
+                label = stringResource(R.string.server_lab_id3),
+                value = state.password,
+                onValueChange = { state.password = it }
+            )
+        }
     }
 }
-

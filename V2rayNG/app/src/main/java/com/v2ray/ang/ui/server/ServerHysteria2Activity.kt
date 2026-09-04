@@ -9,7 +9,6 @@ import com.v2ray.ang.R
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.toast
-import com.v2ray.ang.ui.compose.FormTextField
 import com.v2ray.ang.ui.compose.SettingsSwitchItem
 
 class ServerHysteria2Activity : BaseServerActivity() {
@@ -50,63 +49,70 @@ class ServerHysteria2Activity : BaseServerActivity() {
 
     @Composable
     private fun Hysteria2ProtocolFields(state: ServerUiState) {
-        FormTextField(
-            stringResource(R.string.server_lab_id3),
-            state.password,
-            { state.password = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_obfs_password),
-            state.obfsPassword,
-            { state.obfsPassword = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_port_hop),
-            state.portHopping,
-            { state.portHopping = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_port_hop_interval),
-            state.portHoppingInterval,
-            { state.portHoppingInterval = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_bandwidth_down),
-            state.bandwidthDown,
-            { state.bandwidthDown = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_bandwidth_up),
-            state.bandwidthUp,
-            { state.bandwidthUp = it }
-        )
-
-        SettingsSwitchItem(
-            title = stringResource(R.string.server_lab_allow_insecure),
-            checked = state.allowInsecure,
-            onCheckedChange = { state.allowInsecure = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_sni),
-            state.sni,
-            { state.sni = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_ech_config_list),
-            state.echConfigList,
-            { state.echConfigList = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_pinned_ca256),
-            state.pinnedCA256,
-            { state.pinnedCA256 = it }
-        )
-
-        FormTextField(
-            stringResource(R.string.server_lab_final_mask),
-            state.finalMask,
-            { state.finalMask = it }
-        )
+        EditorSection(title = stringResource(R.string.server_section_credentials)) {
+            EditorTextField(
+                label = stringResource(R.string.server_lab_id3),
+                value = state.password,
+                onValueChange = { state.password = it }
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_obfs_password),
+                value = state.obfsPassword,
+                onValueChange = { state.obfsPassword = it }
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_port_hop),
+                value = state.portHopping,
+                onValueChange = { state.portHopping = it },
+                placeholder = "e.g. 20000-30000"
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_port_hop_interval),
+                value = state.portHoppingInterval,
+                onValueChange = { state.portHoppingInterval = it },
+                placeholder = "30s"
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_bandwidth_down),
+                value = state.bandwidthDown,
+                onValueChange = { state.bandwidthDown = it },
+                placeholder = "0"
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_bandwidth_up),
+                value = state.bandwidthUp,
+                onValueChange = { state.bandwidthUp = it },
+                placeholder = "0"
+            )
+        }
+        EditorSection(title = stringResource(R.string.server_section_security)) {
+            SettingsSwitchItem(
+                title = stringResource(R.string.server_lab_allow_insecure),
+                checked = state.allowInsecure,
+                onCheckedChange = { state.allowInsecure = it }
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_sni),
+                value = state.sni,
+                onValueChange = { state.sni = it }
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_ech_config_list),
+                value = state.echConfigList,
+                onValueChange = { state.echConfigList = it }
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_pinned_ca256),
+                value = state.pinnedCA256,
+                onValueChange = { state.pinnedCA256 = it }
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_final_mask),
+                value = state.finalMask,
+                onValueChange = { state.finalMask = it },
+                placeholder = "{\"outbound\":\"...\"}",
+                maxLines = 3
+            )
+        }
     }
 }
-

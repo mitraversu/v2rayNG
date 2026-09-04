@@ -333,6 +333,13 @@
     <string name="empty_no_results_title">No results</string>
     <string name="empty_no_results_subtitle">Try a different search or port</string>
     <string name="action_add_config">Add config</string>
+    <!-- Mitra unified editor sections -->
+    <string name="server_section_general">General</string>
+    <string name="server_section_server">Server</string>
+    <string name="server_section_credentials">Credentials</string>
+    <string name="server_section_transport">Transport</string>
+    <string name="server_section_transport_subtitle">Network, headers, paths — how this node connects</string>
+    <string name="server_section_security">Security</string>
     <string name="title_export_all">Export configs to clipboard</string>
     <string name="title_sub_setting">Subscriptions</string>
     <string name="sub_setting_remarks">Remarks</string>

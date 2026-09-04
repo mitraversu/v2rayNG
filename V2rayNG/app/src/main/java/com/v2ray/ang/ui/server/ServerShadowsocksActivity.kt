@@ -6,10 +6,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import com.v2ray.ang.R
-import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
-import com.v2ray.ang.ui.compose.FormDropdownField
-import com.v2ray.ang.ui.compose.FormTextField
 
 class ServerShadowsocksActivity : BaseServerActivity() {
 
@@ -44,24 +41,25 @@ class ServerShadowsocksActivity : BaseServerActivity() {
         }
     }
 
-    override fun validateProtocolConfig(config: ProfileItem): Boolean = true
+    override fun validateProtocolConfig(config: com.v2ray.ang.dto.entities.ProfileItem): Boolean = true
 
     @Composable
     private fun ShadowsocksProtocolFields(
         state: ServerUiState,
         methodOptions: List<String>
     ) {
-        FormTextField(
-            stringResource(R.string.server_lab_id3),
-            state.password,
-            { state.password = it }
-        )
-        FormDropdownField(
-            stringResource(R.string.server_lab_security),
-            state.method,
-            methodOptions,
-            { state.method = it }
-        )
+        EditorSection(title = stringResource(R.string.server_section_credentials)) {
+            EditorTextField(
+                label = stringResource(R.string.server_lab_id3),
+                value = state.password,
+                onValueChange = { state.password = it }
+            )
+            EditorDropdownField(
+                label = stringResource(R.string.server_lab_security),
+                value = state.method,
+                options = methodOptions,
+                onValueChange = { state.method = it }
+            )
+        }
     }
 }
-

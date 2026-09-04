@@ -32,17 +32,10 @@ import com.v2ray.ang.ui.logcat.LogcatActivity
 import com.v2ray.ang.ui.perappproxy.PerAppProxyActivity
 import com.v2ray.ang.ui.routing.RoutingSettingActivity
 import com.v2ray.ang.ui.server.ProfileEditorResult
+import com.v2ray.ang.ui.server.ServerActivity
 import com.v2ray.ang.ui.server.ServerCustomConfigActivity
 import com.v2ray.ang.ui.server.ServerGroupActivity
-import com.v2ray.ang.ui.server.ServerHttpActivity
-import com.v2ray.ang.ui.server.ServerHysteria2Activity
 import com.v2ray.ang.ui.server.ServerProxyChainActivity
-import com.v2ray.ang.ui.server.ServerShadowsocksActivity
-import com.v2ray.ang.ui.server.ServerSocksActivity
-import com.v2ray.ang.ui.server.ServerTrojanActivity
-import com.v2ray.ang.ui.server.ServerVlessActivity
-import com.v2ray.ang.ui.server.ServerVmessActivity
-import com.v2ray.ang.ui.server.ServerWireguardActivity
 import com.v2ray.ang.ui.settings.SettingsActivity
 import com.v2ray.ang.ui.subscription.SubSettingActivity
 import com.v2ray.ang.ui.userasset.UserAssetActivity
@@ -195,22 +188,27 @@ class MainActivity : HelperBaseComponentActivity() {
     }
 
     private fun importManually(createConfigType: Int) {
+        // Mitra unified: single-node editors (VMess/VLess/SS/Socks/HTTP/Trojan/WireGuard/Hysteria2) all via ServerActivity
         val intent = when (createConfigType) {
             EConfigType.POLICYGROUP.value -> Intent(this, ServerGroupActivity::class.java)
             EConfigType.PROXYCHAIN.value -> Intent(this, ServerProxyChainActivity::class.java)
-            EConfigType.VMESS.value -> Intent(this, ServerVmessActivity::class.java)
-            EConfigType.VLESS.value -> Intent(this, ServerVlessActivity::class.java)
-            EConfigType.SHADOWSOCKS.value -> Intent(this, ServerShadowsocksActivity::class.java)
-            EConfigType.SOCKS.value -> Intent(this, ServerSocksActivity::class.java)
-            EConfigType.HTTP.value -> Intent(this, ServerHttpActivity::class.java)
-            EConfigType.TROJAN.value -> Intent(this, ServerTrojanActivity::class.java)
-            EConfigType.WIREGUARD.value -> Intent(this, ServerWireguardActivity::class.java)
-            EConfigType.HYSTERIA2.value -> Intent(this, ServerHysteria2Activity::class.java)
-            else -> Intent(this, ServerHttpActivity::class.java).apply {
+            EConfigType.VMESS.value,
+            EConfigType.VLESS.value,
+            EConfigType.SHADOWSOCKS.value,
+            EConfigType.SOCKS.value,
+            EConfigType.HTTP.value,
+            EConfigType.TROJAN.value,
+            EConfigType.WIREGUARD.value,
+            EConfigType.HYSTERIA2.value -> Intent(this, ServerActivity::class.java).apply {
+                putExtra("createConfigType", createConfigType)
+            }
+            else -> Intent(this, ServerActivity::class.java).apply {
                 putExtra("createConfigType", createConfigType)
             }
         }.apply {
             putExtra("subscriptionId", mainViewModel.uiState.value.selectedGroupId)
+            // Ensure ServerActivity always gets the type for new configs
+            if (!hasExtra("createConfigType")) putExtra("createConfigType", createConfigType)
         }
         profileEditorLauncher.launch(intent)
     }
@@ -246,19 +244,20 @@ class MainActivity : HelperBaseComponentActivity() {
     }
 
     private fun editServer(guid: String, profile: ProfileItem) {
+        // Mitra unified: single-node configs edit via ServerActivity; complex types keep dedicated editors
         val activityClass = when (profile.configType) {
             EConfigType.CUSTOM -> ServerCustomConfigActivity::class.java
             EConfigType.POLICYGROUP -> ServerGroupActivity::class.java
             EConfigType.PROXYCHAIN -> ServerProxyChainActivity::class.java
-            EConfigType.VMESS -> ServerVmessActivity::class.java
-            EConfigType.VLESS -> ServerVlessActivity::class.java
-            EConfigType.SHADOWSOCKS -> ServerShadowsocksActivity::class.java
-            EConfigType.SOCKS -> ServerSocksActivity::class.java
-            EConfigType.HTTP -> ServerHttpActivity::class.java
-            EConfigType.TROJAN -> ServerTrojanActivity::class.java
-            EConfigType.WIREGUARD -> ServerWireguardActivity::class.java
-            EConfigType.HYSTERIA2 -> ServerHysteria2Activity::class.java
-            else -> ServerHttpActivity::class.java
+            EConfigType.VMESS,
+            EConfigType.VLESS,
+            EConfigType.SHADOWSOCKS,
+            EConfigType.SOCKS,
+            EConfigType.HTTP,
+            EConfigType.TROJAN,
+            EConfigType.WIREGUARD,
+            EConfigType.HYSTERIA2 -> ServerActivity::class.java
+            else -> ServerActivity::class.java
         }
         val intent = Intent(this, activityClass).apply {
             putExtra("guid", guid)

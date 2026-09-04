@@ -9,8 +9,6 @@ import com.v2ray.ang.R
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.toast
-import com.v2ray.ang.ui.compose.FormDropdownField
-import com.v2ray.ang.ui.compose.FormTextField
 
 class ServerVlessActivity : BaseServerActivity() {
 
@@ -58,21 +56,25 @@ class ServerVlessActivity : BaseServerActivity() {
         state: ServerUiState,
         flowOptions: List<String>
     ) {
-        FormTextField(
-            stringResource(R.string.server_lab_id),
-            state.password,
-            { state.password = it }
-        )
-        FormTextField(
-            stringResource(R.string.server_lab_encryption),
-            state.encryption,
-            { state.encryption = it }
-        )
-        FormDropdownField(
-            stringResource(R.string.server_lab_flow),
-            state.flow,
-            flowOptions,
-            { state.flow = it }
-        )
+        EditorSection(title = stringResource(R.string.server_section_credentials)) {
+            EditorTextField(
+                label = stringResource(R.string.server_lab_id),
+                value = state.password,
+                onValueChange = { state.password = it },
+                placeholder = "UUID"
+            )
+            EditorTextField(
+                label = stringResource(R.string.server_lab_encryption),
+                value = state.encryption,
+                onValueChange = { state.encryption = it },
+                placeholder = "none"
+            )
+            EditorDropdownField(
+                label = stringResource(R.string.server_lab_flow),
+                value = state.flow,
+                options = flowOptions,
+                onValueChange = { state.flow = it }
+            )
+        }
     }
 }

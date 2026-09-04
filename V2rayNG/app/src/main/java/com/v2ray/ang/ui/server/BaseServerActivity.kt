@@ -42,8 +42,6 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.ui.base.BaseComponentActivity
 import com.v2ray.ang.ui.compose.AppTopBar
 import com.v2ray.ang.ui.compose.DeleteConfirmDialog
-import com.v2ray.ang.ui.compose.FormDropdownField
-import com.v2ray.ang.ui.compose.FormTextField
 import com.v2ray.ang.ui.compose.NavigationBarsSpacer
 import com.v2ray.ang.ui.compose.SettingsSwitchItem
 import com.v2ray.ang.ui.compose.verticalScrollbar
@@ -103,22 +101,27 @@ abstract class BaseServerActivity : BaseComponentActivity() {
     protected fun CommonBasicFields(
         state: ServerUiState
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FormTextField(
-                stringResource(R.string.server_lab_remarks),
-                state.remarks,
-                { state.remarks = it }
+        EditorSection(title = stringResource(R.string.server_section_general)) {
+            EditorTextField(
+                label = stringResource(R.string.server_lab_remarks),
+                value = state.remarks,
+                onValueChange = { state.remarks = it },
+                placeholder = "My server"
             )
-            FormTextField(
-                stringResource(R.string.server_lab_address),
-                state.address,
-                { state.address = it }
+        }
+        EditorSection(title = stringResource(R.string.server_section_server)) {
+            EditorTextField(
+                label = stringResource(R.string.server_lab_address),
+                value = state.address,
+                onValueChange = { state.address = it },
+                placeholder = "example.com"
             )
-            FormTextField(
-                stringResource(R.string.server_lab_port),
-                state.port,
-                { state.port = it },
-                keyboardType = KeyboardType.Number
+            EditorTextField(
+                label = stringResource(R.string.server_lab_port),
+                value = state.port,
+                onValueChange = { state.port = it },
+                keyboardType = KeyboardType.Number,
+                placeholder = "443"
             )
         }
     }
@@ -128,12 +131,15 @@ abstract class BaseServerActivity : BaseComponentActivity() {
         state: ServerUiState,
         options: FieldOptions
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FormDropdownField(
-                stringResource(R.string.server_lab_network),
-                state.network,
-                options.networkOptions,
-                { state.network = it }
+        EditorSection(
+            title = stringResource(R.string.server_section_transport),
+            subtitle = stringResource(R.string.server_section_transport_subtitle)
+        ) {
+            EditorDropdownField(
+                label = stringResource(R.string.server_lab_network),
+                value = state.network,
+                options = options.networkOptions,
+                onValueChange = { state.network = it }
             )
 
             val headerOptions = when (state.network) {
@@ -144,21 +150,21 @@ abstract class BaseServerActivity : BaseComponentActivity() {
                 else -> listOf("---")
             }
             if (headerOptions.size > 1) {
-                FormDropdownField(
-                    stringResource(
+                EditorDropdownField(
+                    label = stringResource(
                         when (state.network) {
                             NetworkType.GRPC.type -> R.string.server_lab_mode_type
                             NetworkType.XHTTP.type -> R.string.server_lab_xhttp_mode
                             else -> R.string.server_lab_head_type
                         }
                     ),
-                    when (state.network) {
+                    value = when (state.network) {
                         NetworkType.GRPC.type -> state.mode
                         NetworkType.XHTTP.type -> state.xhttpMode
                         else -> state.headerType
                     },
-                    headerOptions,
-                    {
+                    options = headerOptions,
+                    onValueChange = {
                         when (state.network) {
                             NetworkType.GRPC.type -> state.mode = it
                             NetworkType.XHTTP.type -> state.xhttpMode = it
@@ -168,26 +174,25 @@ abstract class BaseServerActivity : BaseComponentActivity() {
                 )
             }
 
-            FormTextField(
-                stringResource(
+            EditorTextField(
+                label = stringResource(
                     when (state.network) {
                         NetworkType.TCP.type,
                         NetworkType.HTTP_UPGRADE.type,
                         NetworkType.XHTTP.type,
                         NetworkType.H2.type -> R.string.server_lab_request_host_http
-
                         NetworkType.WS.type -> R.string.server_lab_request_host_ws
                         NetworkType.GRPC.type -> R.string.server_lab_request_host_grpc
                         else -> R.string.server_lab_request_host6
                     }
                 ),
-                if (state.network == NetworkType.GRPC.type) state.authority else state.host,
-                { if (state.network == NetworkType.GRPC.type) state.authority = it else state.host = it }
+                value = if (state.network == NetworkType.GRPC.type) state.authority else state.host,
+                onValueChange = { if (state.network == NetworkType.GRPC.type) state.authority = it else state.host = it }
             )
 
             if (state.network != NetworkType.KCP.type) {
-                FormTextField(
-                    stringResource(
+                EditorTextField(
+                    label = stringResource(
                         when (state.network) {
                             NetworkType.WS.type -> R.string.server_lab_path_ws
                             NetworkType.HTTP_UPGRADE.type -> R.string.server_lab_path_httpupgrade
@@ -197,48 +202,51 @@ abstract class BaseServerActivity : BaseComponentActivity() {
                             else -> R.string.server_lab_path
                         }
                     ),
-                    if (state.network == NetworkType.GRPC.type) state.serviceName else state.path,
-                    { if (state.network == NetworkType.GRPC.type) state.serviceName = it else state.path = it }
+                    value = if (state.network == NetworkType.GRPC.type) state.serviceName else state.path,
+                    onValueChange = { if (state.network == NetworkType.GRPC.type) state.serviceName = it else state.path = it }
                 )
             }
 
             if (state.network == NetworkType.XHTTP.type) {
-                FormTextField(
-                    stringResource(R.string.server_lab_xhttp_extra),
-                    state.xhttpExtra,
-                    { state.xhttpExtra = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_xhttp_extra),
+                    value = state.xhttpExtra,
+                    onValueChange = { state.xhttpExtra = it },
+                    placeholder = "{\"extra\":\"json\"}"
                 )
             }
             if (state.network == NetworkType.KCP.type) {
-                FormTextField(
-                    stringResource(R.string.server_lab_path_kcp),
-                    state.seed,
-                    { state.seed = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_path_kcp),
+                    value = state.seed,
+                    onValueChange = { state.seed = it }
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_kcp_mtu),
-                    state.kcpMtu,
-                    { state.kcpMtu = it },
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_kcp_mtu),
+                    value = state.kcpMtu,
+                    onValueChange = { state.kcpMtu = it },
                     keyboardType = KeyboardType.Number
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_kcp_tti),
-                    state.kcpTti,
-                    { state.kcpTti = it },
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_kcp_tti),
+                    value = state.kcpTti,
+                    onValueChange = { state.kcpTti = it },
                     keyboardType = KeyboardType.Number
                 )
             }
-            FormTextField(
-                stringResource(R.string.server_lab_final_mask),
-                state.finalMask,
-                { state.finalMask = it }
+            EditorTextField(
+                label = stringResource(R.string.server_lab_final_mask),
+                value = state.finalMask,
+                onValueChange = { state.finalMask = it },
+                placeholder = "{\"outbound\":\"...\"}",
+                maxLines = 3
             )
             if (state.network == NetworkType.WS.type || state.network == NetworkType.XHTTP.type) {
-                FormDropdownField(
-                    stringResource(R.string.server_lab_browser_dialer),
-                    state.browserDialerMode,
-                    options.browserDialerOptions,
-                    { state.browserDialerMode = it }
+                EditorDropdownField(
+                    label = stringResource(R.string.server_lab_browser_dialer),
+                    value = state.browserDialerMode,
+                    options = options.browserDialerOptions,
+                    onValueChange = { state.browserDialerMode = it }
                 )
             }
         }
@@ -252,28 +260,28 @@ abstract class BaseServerActivity : BaseComponentActivity() {
         buildProfileItem: () -> ProfileItem
     ) {
         val context = LocalContext.current
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FormDropdownField(
-                stringResource(R.string.server_lab_stream_security),
-                state.streamSecurity,
-                options.streamSecurityOptions,
-                { state.streamSecurity = it }
+        EditorSection(title = stringResource(R.string.server_section_security)) {
+            EditorDropdownField(
+                label = stringResource(R.string.server_lab_stream_security),
+                value = state.streamSecurity,
+                options = options.streamSecurityOptions,
+                onValueChange = { state.streamSecurity = it }
             )
 
             if (state.streamSecurity.isBlank()) {
-                return@Column
+                return@EditorSection
             }
 
-            FormTextField(
-                stringResource(R.string.server_lab_sni),
-                state.sni,
-                { state.sni = it }
+            EditorTextField(
+                label = stringResource(R.string.server_lab_sni),
+                value = state.sni,
+                onValueChange = { state.sni = it }
             )
-            FormDropdownField(
-                stringResource(R.string.server_lab_stream_fingerprint),
-                state.fingerPrint,
-                options.uTlsOptions,
-                { state.fingerPrint = it }
+            EditorDropdownField(
+                label = stringResource(R.string.server_lab_stream_fingerprint),
+                value = state.fingerPrint,
+                options = options.uTlsOptions,
+                onValueChange = { state.fingerPrint = it }
             )
 
             if (state.streamSecurity == TLS) {
@@ -282,26 +290,26 @@ abstract class BaseServerActivity : BaseComponentActivity() {
                     checked = state.allowInsecure,
                     onCheckedChange = { state.allowInsecure = it }
                 )
-                FormDropdownField(
-                    stringResource(R.string.server_lab_stream_alpn),
-                    state.alpn,
-                    options.alpnOptions,
-                    { state.alpn = it }
+                EditorDropdownField(
+                    label = stringResource(R.string.server_lab_stream_alpn),
+                    value = state.alpn,
+                    options = options.alpnOptions,
+                    onValueChange = { state.alpn = it }
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_ech_config_list),
-                    state.echConfigList,
-                    { state.echConfigList = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_ech_config_list),
+                    value = state.echConfigList,
+                    onValueChange = { state.echConfigList = it }
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_verify_peer_cert_by_name),
-                    state.verifyPeerCertByName,
-                    { state.verifyPeerCertByName = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_verify_peer_cert_by_name),
+                    value = state.verifyPeerCertByName,
+                    onValueChange = { state.verifyPeerCertByName = it }
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_pinned_ca256),
-                    state.pinnedCA256,
-                    { state.pinnedCA256 = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_pinned_ca256),
+                    value = state.pinnedCA256,
+                    onValueChange = { state.pinnedCA256 = it }
                 )
                 Button(
                     onClick = {
@@ -335,30 +343,30 @@ abstract class BaseServerActivity : BaseComponentActivity() {
                         }
                     },
                     enabled = !state.isFetchingCert,
-                    modifier = Modifier.padding(start = 16.dp)
+                    modifier = Modifier.padding(top = 4.dp)
                 ) {
                     Text(stringResource(R.string.pinned_ca256_action_fetch))
                 }
             } else if (state.streamSecurity == REALITY) {
-                FormTextField(
-                    stringResource(R.string.server_lab_public_key),
-                    state.publicKeyReality,
-                    { state.publicKeyReality = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_public_key),
+                    value = state.publicKeyReality,
+                    onValueChange = { state.publicKeyReality = it }
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_short_id),
-                    state.shortId,
-                    { state.shortId = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_short_id),
+                    value = state.shortId,
+                    onValueChange = { state.shortId = it }
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_spider_x),
-                    state.spiderX,
-                    { state.spiderX = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_spider_x),
+                    value = state.spiderX,
+                    onValueChange = { state.spiderX = it }
                 )
-                FormTextField(
-                    stringResource(R.string.server_lab_mldsa65_verify),
-                    state.mldsa65Verify,
-                    { state.mldsa65Verify = it }
+                EditorTextField(
+                    label = stringResource(R.string.server_lab_mldsa65_verify),
+                    value = state.mldsa65Verify,
+                    onValueChange = { state.mldsa65Verify = it }
                 )
             }
         }

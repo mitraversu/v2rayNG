@@ -48,8 +48,6 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.ui.base.BaseComponentActivity
 import com.v2ray.ang.ui.compose.AppTopBar
 import com.v2ray.ang.ui.compose.DeleteConfirmDialog
-import com.v2ray.ang.ui.compose.FormDropdownField
-import com.v2ray.ang.ui.compose.FormTextField
 import com.v2ray.ang.ui.compose.SettingsSwitchItem
 import com.v2ray.ang.ui.compose.verticalScrollbar
 import com.v2ray.ang.util.JsonUtil
@@ -370,148 +368,323 @@ fun ServerScreen(
                 .imePadding()
                 .verticalScrollbar(listState),
             contentPadding = PaddingValues(bottom = 36.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            item { FormTextField(stringResource(R.string.server_lab_remarks), remarks, { remarks = it }) }
-            item { FormTextField(stringResource(R.string.server_lab_address), address, { address = it }) }
-            if (configType != EConfigType.HYSTERIA2) item { FormTextField(stringResource(R.string.server_lab_port), port, { port = it }, keyboardType = KeyboardType.Number) }
-            when {
-                isVmess || isTrojan || isShadowsocks || isHysteria2 -> item {
-                    FormTextField(
-                        stringResource(
-                            when {
-                                isTrojan || isShadowsocks || isHysteria2 -> R.string.server_lab_id3
-                                else -> R.string.server_lab_id
-                            }
-                        ), password, { password = it })
-                }
-
-                isVless -> {
-                    item { FormTextField(stringResource(R.string.server_lab_id), password, { password = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_encryption), encryption, { encryption = it }) }
-                    item { FormDropdownField(stringResource(R.string.server_lab_flow), flow, flowOptions, { flow = it }) }
-                }
-
-                isSocksOrHttp -> {
-                    item { FormTextField(stringResource(R.string.server_lab_security4), username, { username = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_id4), password, { password = it }) }
-                }
-            }
-            if (isVmess) item { FormDropdownField(stringResource(R.string.server_lab_security), method, securityOptions, { method = it }) }
-            if (isShadowsocks) item { FormDropdownField(stringResource(R.string.server_lab_security), method, ssSecurityOptions, { method = it }) }
-            if (isWireguard) {
-                item { FormTextField(stringResource(R.string.server_lab_secret_key), secretKey, { secretKey = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_public_key), publicKey, { publicKey = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_preshared_key), preSharedKey, { preSharedKey = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_reserved), reserved, { reserved = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_local_address), localAddress, { localAddress = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_local_mtu), mtu, { mtu = it }, keyboardType = KeyboardType.Number) }
-            }
-            if (isHysteria2) {
-                item { FormTextField(stringResource(R.string.server_obfs_password), obfsPassword, { obfsPassword = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_port_hop), portHopping, { portHopping = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_port_hop_interval), portHoppingInterval, { portHoppingInterval = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_bandwidth_down), bandwidthDown, { bandwidthDown = it }) }
-                item { FormTextField(stringResource(R.string.server_lab_bandwidth_up), bandwidthUp, { bandwidthUp = it }) }
-            }
-            item { FormDropdownField(stringResource(R.string.server_lab_network), network, networkOptions, { network = it }) }
-            val headerOptions = when (network) {
-                NetworkType.TCP.type -> tcpHeaderOptions
-                NetworkType.KCP.type -> kcpHeaderOptions
-                NetworkType.GRPC.type -> grpcModeOptions
-                NetworkType.XHTTP.type -> xhttpModeOptions
-                else -> listOf("---")
-            }
-            if (headerOptions.size > 1) {
-                item {
-                    FormDropdownField(
-                        stringResource(
-                            when (network) {
-                                NetworkType.GRPC.type -> R.string.server_lab_mode_type; NetworkType.XHTTP.type -> R.string.server_lab_xhttp_mode; else -> R.string.server_lab_head_type
-                            }
-                        ),
-                        headerType, headerOptions, { headerType = it }
+            // ── General ──
+            item {
+                EditorSection(title = stringResource(R.string.server_section_general)) {
+                    EditorTextField(
+                        label = stringResource(R.string.server_lab_remarks),
+                        value = remarks,
+                        onValueChange = { remarks = it },
+                        placeholder = "My server"
                     )
                 }
             }
+
+            // ── Server ──
             item {
-                FormTextField(
-                    stringResource(
-                        when (network) {
-                            NetworkType.TCP.type, NetworkType.HTTP_UPGRADE.type, NetworkType.XHTTP.type, NetworkType.H2.type -> R.string.server_lab_request_host_http
-                            NetworkType.WS.type -> R.string.server_lab_request_host_ws
-                            NetworkType.GRPC.type -> R.string.server_lab_request_host_grpc
-                            else -> R.string.server_lab_request_host6
+                EditorSection(title = stringResource(R.string.server_section_server)) {
+                    EditorTextField(
+                        label = stringResource(R.string.server_lab_address),
+                        value = address,
+                        onValueChange = { address = it },
+                        placeholder = "example.com"
+                    )
+                    EditorTextField(
+                        label = stringResource(R.string.server_lab_port),
+                        value = port,
+                        onValueChange = { port = it },
+                        keyboardType = KeyboardType.Number,
+                        placeholder = "443"
+                    )
+                }
+            }
+
+            // ── Credentials (protocol-dependent) ──
+            when {
+                isVmess -> item {
+                    EditorSection(title = stringResource(R.string.server_section_credentials)) {
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_id),
+                            value = password,
+                            onValueChange = { password = it },
+                            placeholder = "UUID"
+                        )
+                        EditorDropdownField(
+                            label = stringResource(R.string.server_lab_security),
+                            value = method,
+                            options = securityOptions,
+                            onValueChange = { method = it }
+                        )
+                    }
+                }
+
+                isVless -> item {
+                    EditorSection(title = stringResource(R.string.server_section_credentials)) {
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_id),
+                            value = password,
+                            onValueChange = { password = it },
+                            placeholder = "UUID"
+                        )
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_encryption),
+                            value = encryption,
+                            onValueChange = { encryption = it },
+                            placeholder = "none"
+                        )
+                        EditorDropdownField(
+                            label = stringResource(R.string.server_lab_flow),
+                            value = flow,
+                            options = flowOptions,
+                            onValueChange = { flow = it }
+                        )
+                    }
+                }
+
+                isShadowsocks -> item {
+                    EditorSection(title = stringResource(R.string.server_section_credentials)) {
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_id3),
+                            value = password,
+                            onValueChange = { password = it }
+                        )
+                        EditorDropdownField(
+                            label = stringResource(R.string.server_lab_security),
+                            value = method,
+                            options = ssSecurityOptions,
+                            onValueChange = { method = it }
+                        )
+                    }
+                }
+
+                isTrojan -> item {
+                    EditorSection(title = stringResource(R.string.server_section_credentials)) {
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_id3),
+                            value = password,
+                            onValueChange = { password = it }
+                        )
+                    }
+                }
+
+                isSocksOrHttp -> item {
+                    EditorSection(title = stringResource(R.string.server_section_credentials)) {
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_security4),
+                            value = username,
+                            onValueChange = { username = it }
+                        )
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_id4),
+                            value = password,
+                            onValueChange = { password = it }
+                        )
+                    }
+                }
+
+                isWireguard -> item {
+                    EditorSection(title = stringResource(R.string.server_section_credentials)) {
+                        EditorTextField(stringResource(R.string.server_lab_secret_key), secretKey, { secretKey = it })
+                        EditorTextField(stringResource(R.string.server_lab_public_key), publicKey, { publicKey = it })
+                        EditorTextField(stringResource(R.string.server_lab_preshared_key), preSharedKey, { preSharedKey = it })
+                        EditorTextField(stringResource(R.string.server_lab_reserved), reserved, { reserved = it })
+                        EditorTextField(stringResource(R.string.server_lab_local_address), localAddress, { localAddress = it })
+                        EditorTextField(stringResource(R.string.server_lab_local_mtu), mtu, { mtu = it }, keyboardType = KeyboardType.Number)
+                        EditorTextField(stringResource(R.string.server_lab_final_mask), finalMask, { finalMask = it }, placeholder = "{\"outbound\":\"...\"}", maxLines = 3)
+                    }
+                }
+
+                isHysteria2 -> item {
+                    EditorSection(title = stringResource(R.string.server_section_credentials)) {
+                        EditorTextField(stringResource(R.string.server_lab_id3), password, { password = it })
+                        EditorTextField(stringResource(R.string.server_obfs_password), obfsPassword, { obfsPassword = it })
+                        EditorTextField(stringResource(R.string.server_lab_port_hop), portHopping, { portHopping = it }, placeholder = "e.g. 20000-30000")
+                        EditorTextField(stringResource(R.string.server_lab_port_hop_interval), portHoppingInterval, { portHoppingInterval = it }, placeholder = "30s")
+                        EditorTextField(stringResource(R.string.server_lab_bandwidth_down), bandwidthDown, { bandwidthDown = it }, placeholder = "0")
+                        EditorTextField(stringResource(R.string.server_lab_bandwidth_up), bandwidthUp, { bandwidthUp = it }, placeholder = "0")
+                        EditorTextField(stringResource(R.string.server_lab_final_mask), finalMask, { finalMask = it }, placeholder = "{\"outbound\":\"...\"}", maxLines = 3)
+                    }
+                }
+            }
+
+            // ── Transport ── (only for VMess/VLess/SS/Trojan/Socks/HTTP; WG/Hysteria2 are UDP-native)
+            if (!isWireguard && !isHysteria2) {
+                item {
+                    EditorSection(
+                        title = stringResource(R.string.server_section_transport),
+                        subtitle = if (isWireguard || isHysteria2) null else stringResource(R.string.server_section_transport_subtitle)
+                    ) {
+                        EditorDropdownField(
+                            label = stringResource(R.string.server_lab_network),
+                            value = network,
+                            options = networkOptions,
+                            onValueChange = { network = it }
+                        )
+                        val headerOptions = when (network) {
+                            NetworkType.TCP.type -> tcpHeaderOptions
+                            NetworkType.KCP.type -> kcpHeaderOptions
+                            NetworkType.GRPC.type -> grpcModeOptions
+                            NetworkType.XHTTP.type -> xhttpModeOptions
+                            else -> listOf("---")
                         }
-                    ), host, { host = it })
-            }
-            item {
-                FormTextField(
-                    stringResource(
-                        when (network) {
-                            NetworkType.KCP.type -> R.string.server_lab_path_kcp
-                            NetworkType.WS.type -> R.string.server_lab_path_ws
-                            NetworkType.HTTP_UPGRADE.type -> R.string.server_lab_path_httpupgrade
-                            NetworkType.XHTTP.type -> R.string.server_lab_path_xhttp
-                            NetworkType.H2.type -> R.string.server_lab_path_h2
-                            NetworkType.GRPC.type -> R.string.server_lab_path_grpc
-                            else -> R.string.server_lab_path
-                        }
-                    ), path, { path = it })
-            }
-            if (network == NetworkType.XHTTP.type) {
-                item { FormTextField(stringResource(R.string.server_lab_xhttp_extra), xhttpExtra, { xhttpExtra = it }) }
-            }
-            if (network == NetworkType.KCP.type) {
-                item { FormTextField(stringResource(R.string.server_lab_kcp_mtu), kcpMtu, { kcpMtu = it }, keyboardType = KeyboardType.Number) }
-                item { FormTextField(stringResource(R.string.server_lab_kcp_tti), kcpTti, { kcpTti = it }, keyboardType = KeyboardType.Number) }
-            }
-            item { FormTextField(stringResource(R.string.server_lab_final_mask), finalMask, { finalMask = it }) }
-            if (network == NetworkType.WS.type || network == NetworkType.XHTTP.type) {
-                item { FormDropdownField(stringResource(R.string.server_lab_browser_dialer), browserDialerMode, browserDialerOptions, { browserDialerMode = it }) }
-            }
-            item { FormDropdownField(stringResource(R.string.server_lab_stream_security), streamSecurity, streamSecurityOptions, { streamSecurity = it }) }
-            if (streamSecurity.isNotBlank()) {
-                item { FormTextField(stringResource(R.string.server_lab_sni), sni, { sni = it }) }
-                item { FormDropdownField(stringResource(R.string.server_lab_stream_fingerprint), fingerPrint, uTlsOptions, { fingerPrint = it }) }
-                if (streamSecurity == TLS) {
-                    item { SettingsSwitchItem(title = stringResource(R.string.server_lab_allow_insecure), checked = allowInsecure, onCheckedChange = { allowInsecure = it }) }
-                    item { FormDropdownField(stringResource(R.string.server_lab_stream_alpn), alpn, alpnOptions, { alpn = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_ech_config_list), echConfigList, { echConfigList = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_verify_peer_cert_by_name), verifyPeerCertByName, { verifyPeerCertByName = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_pinned_ca256), pinnedCA256, { pinnedCA256 = it }) }
-                    item {
-                        Button(
-                            onClick = {
-                                if (address.isBlank()) {
-                                    context.toast(R.string.server_lab_address); return@Button
-                                }
-                                if (configType != EConfigType.HYSTERIA2 && (port.toIntOrNull() ?: 0) <= 0) {
-                                    context.toast(R.string.server_lab_port); return@Button
-                                }
-                                val temp = buildProfileItem()
-                                scope.launch {
-                                    isFetchingCert = true
-                                    try {
-                                        val sha256 = withContext(Dispatchers.IO) { CertificateFingerprintManager.fetchForManualFill(temp) }
-                                        if (sha256.isNullOrBlank()) context.toast(R.string.toast_fetch_cert_sha256_failed) else {
-                                            pinnedCA256 = sha256
-                                            context.toastSuccess(R.string.toast_fetch_cert_sha256_success)
-                                        }
-                                    } finally {
-                                        isFetchingCert = false
+                        if (headerOptions.size > 1) {
+                            EditorDropdownField(
+                                label = stringResource(
+                                    when (network) {
+                                        NetworkType.GRPC.type -> R.string.server_lab_mode_type
+                                        NetworkType.XHTTP.type -> R.string.server_lab_xhttp_mode
+                                        else -> R.string.server_lab_head_type
+                                    }
+                                ),
+                                value = when (network) {
+                                    NetworkType.GRPC.type -> mode
+                                    NetworkType.XHTTP.type -> xhttpMode
+                                    else -> headerType
+                                },
+                                options = headerOptions,
+                                onValueChange = {
+                                    when (network) {
+                                        NetworkType.GRPC.type -> mode = it
+                                        NetworkType.XHTTP.type -> xhttpMode = it
+                                        else -> headerType = it
                                     }
                                 }
-                            },
-                            enabled = !isFetchingCert,
-                            modifier = Modifier.padding(start = 16.dp)
-                        ) { Text(stringResource(R.string.pinned_ca256_action_fetch)) }
+                            )
+                        }
+                        if (!isWireguard) {
+                            EditorTextField(
+                                label = stringResource(
+                                    when (network) {
+                                        NetworkType.TCP.type, NetworkType.HTTP_UPGRADE.type, NetworkType.XHTTP.type, NetworkType.H2.type -> R.string.server_lab_request_host_http
+                                        NetworkType.WS.type -> R.string.server_lab_request_host_ws
+                                        NetworkType.GRPC.type -> R.string.server_lab_request_host_grpc
+                                        else -> R.string.server_lab_request_host6
+                                    }
+                                ),
+                                value = if (network == NetworkType.GRPC.type) authority else host,
+                                onValueChange = { if (network == NetworkType.GRPC.type) authority = it else host = it }
+                            )
+                            EditorTextField(
+                                label = stringResource(
+                                    when (network) {
+                                        NetworkType.KCP.type -> R.string.server_lab_path_kcp
+                                        NetworkType.WS.type -> R.string.server_lab_path_ws
+                                        NetworkType.HTTP_UPGRADE.type -> R.string.server_lab_path_httpupgrade
+                                        NetworkType.XHTTP.type -> R.string.server_lab_path_xhttp
+                                        NetworkType.H2.type -> R.string.server_lab_path_h2
+                                        NetworkType.GRPC.type -> R.string.server_lab_path_grpc
+                                        else -> R.string.server_lab_path
+                                    }
+                                ),
+                                value = if (network == NetworkType.GRPC.type) serviceName else if (network == NetworkType.KCP.type) seed else path,
+                                onValueChange = {
+                                    if (network == NetworkType.GRPC.type) serviceName = it
+                                    else if (network == NetworkType.KCP.type) seed = it
+                                    else path = it
+                                }
+                            )
+                            if (network == NetworkType.XHTTP.type) {
+                                EditorTextField(stringResource(R.string.server_lab_xhttp_extra), xhttpExtra, { xhttpExtra = it }, placeholder = "{\"extra\":\"json\"}")
+                            }
+                            if (network == NetworkType.KCP.type) {
+                                EditorTextField(stringResource(R.string.server_lab_kcp_mtu), kcpMtu, { kcpMtu = it }, keyboardType = KeyboardType.Number)
+                                EditorTextField(stringResource(R.string.server_lab_kcp_tti), kcpTti, { kcpTti = it }, keyboardType = KeyboardType.Number)
+                            }
+                            if (network == NetworkType.WS.type || network == NetworkType.XHTTP.type) {
+                                EditorDropdownField(
+                                    label = stringResource(R.string.server_lab_browser_dialer),
+                                    value = browserDialerMode,
+                                    options = browserDialerOptions,
+                                    onValueChange = { browserDialerMode = it }
+                                )
+                            }
+                        }
+                        // FinalMask is common to all (even WG/HY2) for advanced routing
+                        EditorTextField(
+                            label = stringResource(R.string.server_lab_final_mask),
+                            value = finalMask,
+                            onValueChange = { finalMask = it },
+                            placeholder = "{\"outbound\":\"...\"}",
+                            maxLines = 3
+                        )
                     }
-                } else if (streamSecurity == REALITY) {
-                    item { FormTextField(stringResource(R.string.server_lab_public_key), publicKeyReality, { publicKeyReality = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_short_id), shortId, { shortId = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_spider_x), spiderX, { spiderX = it }) }
-                    item { FormTextField(stringResource(R.string.server_lab_mldsa65_verify), mldsa65Verify, { mldsa65Verify = it }) }
+                }
+            }
+
+            // ── Security ── (hidden for WireGuard — not TLS-based)
+            if (!isWireguard) {
+                item {
+                    EditorSection(title = stringResource(R.string.server_section_security)) {
+                        if (isHysteria2) {
+                            SettingsSwitchItem(
+                                title = stringResource(R.string.server_lab_allow_insecure),
+                                checked = allowInsecure,
+                                onCheckedChange = { allowInsecure = it }
+                            )
+                            EditorTextField(stringResource(R.string.server_lab_sni), sni, { sni = it })
+                            EditorTextField(stringResource(R.string.server_lab_ech_config_list), echConfigList, { echConfigList = it })
+                            EditorTextField(stringResource(R.string.server_lab_pinned_ca256), pinnedCA256, { pinnedCA256 = it })
+                        } else {
+                            EditorDropdownField(
+                                label = stringResource(R.string.server_lab_stream_security),
+                                value = streamSecurity,
+                                options = streamSecurityOptions,
+                                onValueChange = { streamSecurity = it }
+                            )
+                            if (streamSecurity.isNotBlank()) {
+                                EditorTextField(stringResource(R.string.server_lab_sni), sni, { sni = it })
+                                EditorDropdownField(
+                                    label = stringResource(R.string.server_lab_stream_fingerprint),
+                                    value = fingerPrint,
+                                    options = uTlsOptions,
+                                    onValueChange = { fingerPrint = it }
+                                )
+                                if (streamSecurity == TLS) {
+                                    SettingsSwitchItem(
+                                        title = stringResource(R.string.server_lab_allow_insecure),
+                                        checked = allowInsecure,
+                                        onCheckedChange = { allowInsecure = it }
+                                    )
+                                    EditorDropdownField(stringResource(R.string.server_lab_stream_alpn), alpn, alpnOptions, { alpn = it })
+                                    EditorTextField(stringResource(R.string.server_lab_ech_config_list), echConfigList, { echConfigList = it })
+                                    EditorTextField(stringResource(R.string.server_lab_verify_peer_cert_by_name), verifyPeerCertByName, { verifyPeerCertByName = it })
+                                    EditorTextField(stringResource(R.string.server_lab_pinned_ca256), pinnedCA256, { pinnedCA256 = it })
+                                    Button(
+                                        onClick = {
+                                            if (address.isBlank()) {
+                                                context.toast(R.string.server_lab_address); return@Button
+                                            }
+                                            if ((port.toIntOrNull() ?: 0) <= 0) {
+                                                context.toast(R.string.server_lab_port); return@Button
+                                            }
+                                            val temp = buildProfileItem()
+                                            scope.launch {
+                                                isFetchingCert = true
+                                                try {
+                                                    val sha256 = withContext(Dispatchers.IO) { CertificateFingerprintManager.fetchForManualFill(temp) }
+                                                    if (sha256.isNullOrBlank()) context.toast(R.string.toast_fetch_cert_sha256_failed) else {
+                                                        pinnedCA256 = sha256
+                                                        context.toastSuccess(R.string.toast_fetch_cert_sha256_success)
+                                                    }
+                                                } finally {
+                                                    isFetchingCert = false
+                                                }
+                                            }
+                                        },
+                                        enabled = !isFetchingCert,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    ) { Text(stringResource(R.string.pinned_ca256_action_fetch)) }
+                                } else if (streamSecurity == REALITY) {
+                                    EditorTextField(stringResource(R.string.server_lab_public_key), publicKeyReality, { publicKeyReality = it })
+                                    EditorTextField(stringResource(R.string.server_lab_short_id), shortId, { shortId = it })
+                                    EditorTextField(stringResource(R.string.server_lab_spider_x), spiderX, { spiderX = it })
+                                    EditorTextField(stringResource(R.string.server_lab_mldsa65_verify), mldsa65Verify, { mldsa65Verify = it })
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
