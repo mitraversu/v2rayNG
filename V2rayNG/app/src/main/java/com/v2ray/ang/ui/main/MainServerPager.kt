@@ -51,6 +51,7 @@ import com.v2ray.ang.dto.LocateTarget
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.ui.compose.ReorderableGridItem
 import com.v2ray.ang.ui.compose.ReorderableListItem
+import com.v2ray.ang.ui.compose.SparklineOrDot
 import com.v2ray.ang.ui.compose.colorPing
 import com.v2ray.ang.ui.compose.colorPingRed
 import com.v2ray.ang.ui.compose.verticalScrollbar
@@ -388,11 +389,10 @@ private fun ServerListItem(
 
             Spacer(Modifier.height(8.dp))
 
-            // Bottom row: protocol chip + ping pill — minimal capsules
+            // Bottom row: protocol capsule + minimal 1px sparkline + ping pill
             Row(
                 Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Protocol — subtle surfaceContainerHigh capsule
                 Box(
@@ -412,8 +412,24 @@ private fun ServerListItem(
                         maxLines = 1
                     )
                 }
-                if (hasPing) {
+                // Mitra minimal sparkline — 1px thin line, only if history exists
+                if (row.pingHistory.size >= 2) {
                     Spacer(Modifier.width(8.dp))
+                    SparklineOrDot(
+                        values = row.pingHistory,
+                        modifier = Modifier
+                            .width(56.dp)
+                            .height(14.dp)
+                    )
+                } else if (row.pingHistory.size == 1) {
+                    Spacer(Modifier.width(8.dp))
+                    SparklineOrDot(
+                        values = row.pingHistory,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                if (hasPing) {
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(100.dp))

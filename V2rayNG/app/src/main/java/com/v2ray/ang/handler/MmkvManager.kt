@@ -473,17 +473,25 @@ object MmkvManager {
     }
 
     /**
-     * Encodes the server test delay in milliseconds.
+     * Encodes the server test delay in milliseconds and appends to pingHistory.
+     * Keeps last 12 results for minimal sparkline.
      *
      * @param guid The server GUID.
      * @param testResult The test delay in milliseconds.
      */
     fun encodeServerTestDelayMillis(guid: String, testResult: Long) {
-        if (guid.isBlank()) {
-            return
-        }
+        if (guid.isBlank()) return
         val aff = decodeServerAffiliationInfo(guid) ?: ServerAffiliationInfo()
         aff.testDelayMillis = testResult
+        // Mitra sparkline: keep last 12, drop old, ignore 0 (untested) for history
+        if (testResult != 0L) {
+            val hist = aff.pingHistory
+            hist.add(testResult)
+            if (hist.size > 12) hist.removeAt(0)
+            // Clamp negative to 0 for drawing but keep -1 marker
+            // Keep as stored for color logic elsewhere
+            aff.pingHistory = hist
+        }
         serverAffStorage.encode(guid, JsonUtil.toJson(aff))
     }
 
@@ -496,6 +504,7 @@ object MmkvManager {
         keys?.forEach { key ->
             decodeServerAffiliationInfo(key)?.let { aff ->
                 aff.testDelayMillis = 0
+                aff.pingHistory.clear()
                 serverAffStorage.encode(key, JsonUtil.toJson(aff))
             }
         }
